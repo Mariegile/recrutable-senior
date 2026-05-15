@@ -12,9 +12,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 //   • Signaux de confiance visibles
 // ═══════════════════════════════════════════════════════════════════
 
-const STRIPE_UNIQUE  = "https://buy.stripe.com/7sYaEXbRG7gO6PU06E93y01";
-const STRIPE_MENSUEL = "https://buy.stripe.com/5kQaEX5ti58G8Y2aLi93y00";
-const SUPPORT_EMAIL  = "contact@recrutable.fr";
+// ── Liens Stripe Officiels ─────────────────────────────────────────
+const STRIPE_MENSUEL  = "https://buy.stripe.com/9B6eVe9Qc4lD9JQcL5eEo02"; // 2,99 € / mois
+const STRIPE_ANNUEL   = "https://buy.stripe.com/4gM8wQ7I4aK12hobH1eEo01"; // 24,99 € / an
+const STRIPE_RECHARGE = "https://buy.stripe.com/fZu00k2nKcS92ho9yTeEo00"; // 1,99 € recharge
+const SUPPORT_EMAIL   = "contact@recrutable.fr";
 
 // ── Coût en crédits par action ─────────────────────────────────────
 const CREDITS = {
@@ -23,6 +25,13 @@ const CREDITS = {
   REWRITE: 2,
   LETTRE:  1,
   PIVOT:   1,
+};
+
+// ── Crédits attribués après paiement ───────────────────────────────
+const RECHARGE_CREDITS = {
+  mensuel:  10,  // 2,99 € → 10 crédits
+  annuel:  120,  // 24,99 € → 120 crédits (économie 30% vs mensuel)
+  recharge:  5,  // 1,99 € → 5 crédits supplémentaires
 };
 
 const LIMITS = {
@@ -438,7 +447,7 @@ function PaperBG() {
   );
 }
 
-function Header({ credits }) {
+function Header({ credits, onCreditsClick }) {
   return (
     <div style={{
       background: C.bgCard,
@@ -464,31 +473,47 @@ function Header({ credits }) {
             Votre CV passe enfin les filtres des recruteurs
           </p>
         </div>
-        <CreditBadge credits={credits}/>
+        <CreditBadge credits={credits} onClick={onCreditsClick}/>
       </div>
     </div>
   );
 }
 
-function CreditBadge({ credits }) {
+function CreditBadge({ credits, onClick }) {
   const color = credits >= 3 ? C.success : credits >= 1 ? C.accent : C.error;
   const bg    = credits >= 3 ? C.successSoft : credits >= 1 ? C.accentSoft : C.errorSoft;
+  const [hover, setHover] = useState(false);
   return (
-    <div style={{
-      background: bg, border: `1px solid ${color}40`,
-      borderRadius: "10px", padding: "10px 16px",
-      display: "flex", alignItems: "center", gap: "8px",
-    }}>
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title="Cliquez pour voir les abonnements et recharges"
+      style={{
+        background: bg,
+        border: `2px solid ${hover ? color : `${color}40`}`,
+        borderRadius: "10px", padding: "10px 16px",
+        display: "flex", alignItems: "center", gap: "8px",
+        cursor: "pointer",
+        fontFamily: FONT_SANS,
+        transition: "all 0.15s ease",
+        transform: hover ? "translateY(-1px)" : "translateY(0)",
+        boxShadow: hover ? `0 4px 12px ${color}33` : "none",
+      }}
+    >
       <span style={{ fontSize: "18px" }}>🎟️</span>
-      <div>
+      <div style={{ textAlign: "left" }}>
         <div style={{ fontSize: "12px", color: C.textMuted, fontFamily: FONT_SANS, fontWeight: 500, lineHeight: 1 }}>
           Vérifications restantes
         </div>
-        <div style={{ fontSize: "20px", color, fontFamily: FONT_SERIF, fontWeight: 700, lineHeight: 1.2 }}>
+        <div style={{ fontSize: "20px", color, fontFamily: FONT_SERIF, fontWeight: 700, lineHeight: 1.2, display: "flex", alignItems: "baseline", gap: "6px" }}>
           {credits}
+          <span style={{ fontSize: "11px", color: C.textMuted, fontWeight: 600, opacity: hover ? 1 : 0.7 }}>
+            (recharger)
+          </span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -1045,23 +1070,34 @@ function BlurPaywall({ content, onPaid }) {
   const lines   = content.split("\n");
   const preview = lines.slice(0, 4).join("\n");
   const hidden  = lines.slice(4).join("\n");
-  const [selected, setSelected] = useState("mensuel");
+  const [selected, setSelected] = useState("annuel");
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const FORMULES = {
-    unique: {
-      label: "Dossier unique",
-      prix: "29 €", sous: "Paiement en une fois",
-      items: ["CV optimisé prêt à envoyer", "Lettre de motivation personnalisée", "Téléchargement immédiat"],
-      href: STRIPE_UNIQUE,
-      cta: "Payer 29 € — Dossier unique",
+    annuel: {
+      label: "Abonnement annuel",
+      prix: "24,99 €", sous: "soit 2,08 € / mois",
+      items: ["120 crédits inclus pour l'année", "Économisez 30 % vs mensuel", "Accès complet 12 mois"],
+      href: STRIPE_ANNUEL,
+      cta: "Choisir l'annuel à 24,99 €",
+      badge: "★ Meilleure offre",
+      credits: RECHARGE_CREDITS.annuel,
     },
     mensuel: {
       label: "Abonnement mensuel",
-      prix: "19 €", sous: "par mois, sans engagement",
-      items: ["CV illimités", "Lettres illimitées", "Résiliable à tout moment"],
+      prix: "2,99 €", sous: "par mois, sans engagement",
+      items: ["10 crédits par mois", "Résiliable à tout moment", "Idéal pour tester"],
       href: STRIPE_MENSUEL,
-      cta: "Démarrer à 19 € / mois",
-      badge: "★ Conseillé",
+      cta: "S'abonner à 2,99 € / mois",
+      credits: RECHARGE_CREDITS.mensuel,
+    },
+    recharge: {
+      label: "Recharge rapide",
+      prix: "1,99 €", sous: "paiement unique",
+      items: ["5 crédits supplémentaires", "Sans abonnement", "Utilisable immédiatement"],
+      href: STRIPE_RECHARGE,
+      cta: "Prendre 5 crédits — 1,99 €",
+      credits: RECHARGE_CREDITS.recharge,
     },
   };
   const f = FORMULES[selected];
@@ -1094,34 +1130,35 @@ function BlurPaywall({ content, onPaid }) {
           fontSize: "16px", lineHeight: 1.85,
           whiteSpace: "pre-wrap", color: C.text,
           filter: "blur(6px)", userSelect: "none",
-          minHeight: "140px",
+          minHeight: "240px",
         }}>
           {hidden || "La suite de votre document apparaît ici, masquée jusqu'au paiement."}
         </div>
 
         <div style={{
           position: "absolute", inset: 0,
-          background: "rgba(255,255,255,0.96)",
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-          padding: "32px 24px",
+          background: "rgba(255,255,255,0.97)",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
+          padding: "28px 20px", overflowY: "auto",
         }}>
-          <div style={{ fontSize: "44px", marginBottom: "12px" }}>🔓</div>
+          <div style={{ fontSize: "44px", marginBottom: "10px" }}>🔓</div>
           <h3 style={{
-            margin: 0, fontSize: "24px", fontWeight: 700,
+            margin: 0, fontSize: "22px", fontWeight: 700,
             fontFamily: FONT_SERIF, color: C.text, textAlign: "center",
           }}>
             Débloquez votre dossier complet
           </h3>
           <p style={{
-            margin: "8px 0 24px", fontSize: "15px", color: C.textSecondary,
+            margin: "8px 0 20px", fontSize: "15px", color: C.textSecondary,
             textAlign: "center", maxWidth: "440px", lineHeight: 1.5,
           }}>
             CV complet, lettre de motivation et téléchargement au format prêt à imprimer.
           </p>
 
+          {/* Cartes empilées verticalement — meilleure lisibilité mobile/senior */}
           <div style={{
-            display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px",
-            width: "100%", maxWidth: "500px", marginBottom: "20px",
+            display: "flex", flexDirection: "column", gap: "10px",
+            width: "100%", maxWidth: "500px", marginBottom: "16px",
           }}>
             {Object.entries(FORMULES).map(([key, fm]) => {
               const sel = selected === key;
@@ -1130,35 +1167,39 @@ function BlurPaywall({ content, onPaid }) {
                   key={key}
                   onClick={() => setSelected(key)}
                   style={{
-                    padding: "20px 16px",
+                    padding: "16px 18px",
                     borderRadius: "12px",
                     border: `2px solid ${sel ? C.primary : C.border}`,
                     background: sel ? C.primarySoft : C.bgCard,
-                    cursor: "pointer", textAlign: "center", position: "relative",
+                    cursor: "pointer", textAlign: "left", position: "relative",
                     transition: "all 0.15s ease",
                     fontFamily: FONT_SANS,
                   }}
                 >
                   {fm.badge && (
                     <div style={{
-                      position: "absolute", top: "-12px", left: "50%", transform: "translateX(-50%)",
+                      position: "absolute", top: "-10px", right: "16px",
                       background: C.accent, color: "#FFF",
-                      fontSize: "11px", fontWeight: 700, padding: "4px 12px", borderRadius: "12px",
+                      fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "10px",
                       letterSpacing: "0.04em",
                     }}>
                       {fm.badge}
                     </div>
                   )}
-                  <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 600, marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                    {fm.label}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>
+                    <div style={{ fontSize: "14px", color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                      {fm.label}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                      <span style={{ fontSize: "22px", fontWeight: 700, color: sel ? C.primary : C.text, fontFamily: FONT_SERIF, lineHeight: 1 }}>
+                        {fm.prix}
+                      </span>
+                      <span style={{ fontSize: "12px", color: C.textSecondary, fontWeight: 500 }}>
+                        {fm.sous}
+                      </span>
+                    </div>
                   </div>
-                  <div style={{ fontSize: "30px", fontWeight: 700, color: sel ? C.primary : C.text, fontFamily: FONT_SERIF, lineHeight: 1 }}>
-                    {fm.prix}
-                  </div>
-                  <div style={{ fontSize: "13px", color: C.textSecondary, marginTop: "4px", fontWeight: 500 }}>
-                    {fm.sous}
-                  </div>
-                  <div style={{ marginTop: "14px", textAlign: "left", display: "flex", flexDirection: "column", gap: "6px" }}>
+                  <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "4px" }}>
                     {fm.items.map((item, i) => (
                       <div key={i} style={{ fontSize: "13px", color: C.textSecondary, display: "flex", gap: "6px", alignItems: "flex-start" }}>
                         <span style={{ color: C.success, fontWeight: 700, flexShrink: 0 }}>✓</span>
@@ -1173,12 +1214,12 @@ function BlurPaywall({ content, onPaid }) {
 
           <a href={f.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", width: "100%", maxWidth: "500px" }}>
             <div style={{
-              minHeight: "64px",
+              minHeight: "60px",
               padding: "18px 24px",
               borderRadius: "12px",
               background: C.accent,
               color: "#FFF",
-              fontSize: "18px",
+              fontSize: "17px",
               fontWeight: 700,
               textAlign: "center",
               cursor: "pointer",
@@ -1190,26 +1231,89 @@ function BlurPaywall({ content, onPaid }) {
             </div>
           </a>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "16px", fontSize: "13px", color: C.textMuted, fontWeight: 500 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "14px", fontSize: "13px", color: C.textMuted, fontWeight: 500, textAlign: "center" }}>
             <span style={{ fontSize: "16px" }}>🔒</span>
             Paiement 100 % sécurisé par Stripe
-            {selected === "mensuel" && " · Résiliable en 2 clics"}
           </div>
 
-          <button
-            onClick={onPaid}
-            style={{
-              marginTop: "14px",
-              background: "transparent",
-              border: `1px solid ${C.border}`,
-              color: C.textMuted,
-              fontSize: "13px", padding: "8px 18px",
-              borderRadius: "8px", cursor: "pointer",
-              fontFamily: FONT_SANS, fontWeight: 500,
-            }}
-          >
-            J'ai déjà payé — débloquer mon accès
-          </button>
+          {/* Bouton « J'ai déjà payé » — révèle la confirmation */}
+          {!showConfirm && (
+            <button
+              onClick={() => setShowConfirm(true)}
+              style={{
+                marginTop: "14px",
+                background: "transparent",
+                border: `1px solid ${C.border}`,
+                color: C.textMuted,
+                fontSize: "13px", padding: "8px 18px",
+                borderRadius: "8px", cursor: "pointer",
+                fontFamily: FONT_SANS, fontWeight: 500,
+              }}
+            >
+              J'ai déjà payé — débloquer mon accès
+            </button>
+          )}
+
+          {showConfirm && (
+            <div style={{
+              marginTop: "16px",
+              width: "100%", maxWidth: "500px",
+              background: C.bgCard,
+              border: `2px solid ${C.primary}`,
+              borderRadius: "12px",
+              padding: "18px 20px",
+              textAlign: "center",
+            }}>
+              <div style={{ fontSize: "15px", fontWeight: 700, color: C.primary, marginBottom: "12px" }}>
+                Quelle formule avez-vous payée ?
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <button
+                  onClick={() => onPaid("annuel")}
+                  style={{
+                    padding: "12px 16px", borderRadius: "10px",
+                    border: `2px solid ${C.success}`, background: C.successSoft, color: C.success,
+                    fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_SANS,
+                  }}
+                >
+                  Annuel 24,99 € → recevoir 120 crédits
+                </button>
+                <button
+                  onClick={() => onPaid("mensuel")}
+                  style={{
+                    padding: "12px 16px", borderRadius: "10px",
+                    border: `2px solid ${C.primary}`, background: C.primarySoft, color: C.primary,
+                    fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_SANS,
+                  }}
+                >
+                  Mensuel 2,99 € → recevoir 10 crédits
+                </button>
+                <button
+                  onClick={() => onPaid("recharge")}
+                  style={{
+                    padding: "12px 16px", borderRadius: "10px",
+                    border: `2px solid ${C.accent}`, background: C.accentSoft, color: C.accent,
+                    fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_SANS,
+                  }}
+                >
+                  Recharge 1,99 € → recevoir 5 crédits
+                </button>
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  style={{
+                    padding: "8px", marginTop: "4px",
+                    background: "transparent", border: "none", color: C.textMuted,
+                    fontSize: "13px", cursor: "pointer", fontFamily: FONT_SANS,
+                  }}
+                >
+                  Annuler
+                </button>
+              </div>
+              <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "10px", fontStyle: "italic" }}>
+                Vous recevrez aussi un email de confirmation de Stripe.
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1297,6 +1401,270 @@ function Footer() {
   );
 }
 
+// ── Modal des offres : ouverte depuis le badge des crédits ─────────
+function OffresModal({ open, onClose, onPaid, credits }) {
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  // Empêche le scroll du body quand le modal est ouvert
+  useEffect(() => {
+    if (open) {
+      const original = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = original; };
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const OFFRES = [
+    {
+      key: "annuel",
+      label: "Abonnement annuel",
+      prix: "24,99 €", sous: "soit 2,08 € / mois",
+      items: ["120 crédits inclus", "Économisez 30 % vs mensuel", "Accès complet 12 mois"],
+      href: STRIPE_ANNUEL,
+      cta: "Choisir l'annuel — 24,99 €",
+      badge: "★ Meilleure offre",
+      color: C.accent,
+    },
+    {
+      key: "mensuel",
+      label: "Abonnement mensuel",
+      prix: "2,99 €", sous: "par mois, sans engagement",
+      items: ["10 crédits par mois", "Résiliable à tout moment", "Idéal pour tester"],
+      href: STRIPE_MENSUEL,
+      cta: "S'abonner — 2,99 € / mois",
+      color: C.primary,
+    },
+    {
+      key: "recharge",
+      label: "Recharge rapide",
+      prix: "1,99 €", sous: "paiement unique",
+      items: ["5 crédits supplémentaires", "Sans abonnement", "Utilisable immédiatement"],
+      href: STRIPE_RECHARGE,
+      cta: "Prendre 5 crédits — 1,99 €",
+      color: C.success,
+    },
+  ];
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(15,37,64,0.65)",
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        padding: "20px 12px",
+        overflowY: "auto",
+        animation: "fadeIn 0.2s ease",
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: C.bgCard,
+          borderRadius: "16px",
+          maxWidth: "560px", width: "100%",
+          padding: "24px 22px",
+          fontFamily: FONT_SANS,
+          position: "relative",
+          marginTop: "20px",
+          marginBottom: "20px",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+        }}
+      >
+        {/* Bouton fermer */}
+        <button
+          onClick={onClose}
+          aria-label="Fermer"
+          style={{
+            position: "absolute", top: "12px", right: "12px",
+            width: "40px", height: "40px",
+            background: C.bgSubtle,
+            border: `1px solid ${C.border}`,
+            borderRadius: "50%",
+            fontSize: "20px", fontWeight: 700,
+            color: C.textSecondary,
+            cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+        >
+          ✕
+        </button>
+
+        {/* Crédits restants */}
+        <div style={{
+          background: C.primarySoft,
+          border: `1px solid ${C.primary}33`,
+          borderRadius: "12px",
+          padding: "14px 18px",
+          marginBottom: "20px",
+          marginTop: "8px",
+          marginRight: "44px",
+        }}>
+          <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 500 }}>
+            Il vous reste actuellement
+          </div>
+          <div style={{ fontSize: "26px", color: C.primary, fontFamily: FONT_SERIF, fontWeight: 700, lineHeight: 1.2 }}>
+            {credits} <span style={{ fontSize: "15px", fontWeight: 500, color: C.textSecondary }}>vérification{credits > 1 ? "s" : ""}</span>
+          </div>
+        </div>
+
+        <h2 style={{
+          margin: "0 0 6px", fontSize: "22px", fontFamily: FONT_SERIF, fontWeight: 700, color: C.text,
+        }}>
+          Recharger mon compte
+        </h2>
+        <p style={{
+          margin: "0 0 20px", fontSize: "15px", color: C.textSecondary, lineHeight: 1.5,
+        }}>
+          Choisissez la formule qui vous convient. Paiement sécurisé via Stripe.
+        </p>
+
+        {/* Cartes empilées */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
+          {OFFRES.map(o => (
+            <div key={o.key} style={{
+              border: `2px solid ${C.border}`,
+              borderRadius: "12px",
+              padding: "16px 18px",
+              position: "relative",
+              background: C.bgCard,
+            }}>
+              {o.badge && (
+                <div style={{
+                  position: "absolute", top: "-10px", right: "16px",
+                  background: o.color, color: "#FFF",
+                  fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "10px",
+                  letterSpacing: "0.04em",
+                }}>
+                  {o.badge}
+                </div>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
+                <div style={{ fontSize: "14px", color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                  {o.label}
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                  <span style={{ fontSize: "22px", fontWeight: 700, color: o.color, fontFamily: FONT_SERIF, lineHeight: 1 }}>
+                    {o.prix}
+                  </span>
+                  <span style={{ fontSize: "12px", color: C.textSecondary, fontWeight: 500 }}>
+                    {o.sous}
+                  </span>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "14px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                {o.items.map((item, i) => (
+                  <div key={i} style={{ fontSize: "13px", color: C.textSecondary, display: "flex", gap: "6px", alignItems: "flex-start" }}>
+                    <span style={{ color: C.success, fontWeight: 700, flexShrink: 0 }}>✓</span>
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+
+              <a href={o.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                <div style={{
+                  minHeight: "52px",
+                  padding: "14px 18px",
+                  borderRadius: "10px",
+                  background: o.color,
+                  color: "#FFF",
+                  fontSize: "15px",
+                  fontWeight: 700,
+                  textAlign: "center",
+                  cursor: "pointer",
+                  fontFamily: FONT_SANS,
+                }}>
+                  {o.cta}
+                </div>
+              </a>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ textAlign: "center", fontSize: "13px", color: C.textMuted, marginBottom: "12px" }}>
+          🔒 Paiement 100 % sécurisé · Sans engagement · RGPD
+        </div>
+
+        {/* Bouton « J'ai déjà payé » */}
+        {!showConfirm ? (
+          <button
+            onClick={() => setShowConfirm(true)}
+            style={{
+              width: "100%",
+              background: "transparent",
+              border: `1px solid ${C.borderStrong}`,
+              color: C.textSecondary,
+              fontSize: "14px", padding: "12px 18px",
+              borderRadius: "10px", cursor: "pointer",
+              fontFamily: FONT_SANS, fontWeight: 600,
+            }}
+          >
+            J'ai déjà payé — recevoir mes crédits
+          </button>
+        ) : (
+          <div style={{
+            background: C.bgSubtle,
+            border: `2px solid ${C.primary}`,
+            borderRadius: "12px",
+            padding: "16px 18px",
+            textAlign: "center",
+          }}>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: C.primary, marginBottom: "12px" }}>
+              Quelle formule avez-vous payée ?
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <button
+                onClick={() => { onPaid("annuel"); onClose(); }}
+                style={{
+                  padding: "12px 16px", borderRadius: "10px",
+                  border: `2px solid ${C.success}`, background: C.successSoft, color: C.success,
+                  fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_SANS,
+                }}
+              >
+                Annuel 24,99 € → +120 crédits
+              </button>
+              <button
+                onClick={() => { onPaid("mensuel"); onClose(); }}
+                style={{
+                  padding: "12px 16px", borderRadius: "10px",
+                  border: `2px solid ${C.primary}`, background: C.primarySoft, color: C.primary,
+                  fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_SANS,
+                }}
+              >
+                Mensuel 2,99 € → +10 crédits
+              </button>
+              <button
+                onClick={() => { onPaid("recharge"); onClose(); }}
+                style={{
+                  padding: "12px 16px", borderRadius: "10px",
+                  border: `2px solid ${C.accent}`, background: C.accentSoft, color: C.accent,
+                  fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_SANS,
+                }}
+              >
+                Recharge 1,99 € → +5 crédits
+              </button>
+              <button
+                onClick={() => setShowConfirm(false)}
+                style={{
+                  padding: "8px", marginTop: "2px",
+                  background: "transparent", border: "none", color: C.textMuted,
+                  fontSize: "13px", cursor: "pointer", fontFamily: FONT_SANS,
+                }}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //   APP PRINCIPALE
 // ═══════════════════════════════════════════════════════════════════
@@ -1321,6 +1689,7 @@ export default function App() {
   const [lettreError, setLettreError]       = useState("");
   const [secteur, setSecteur]               = useState("default");
   const [paid, setPaid]                     = useState(false);
+  const [showOffres, setShowOffres]         = useState(false);
   const [credits, setCredits]               = useState(getCredits);
   const [pivots, setPivots]                 = useState(null);
   const [pivotLoading, setPivotLoading]     = useState(false);
@@ -1461,6 +1830,13 @@ export default function App() {
     setPivots(null); setPivotError(""); setShowPivot(false);
   };
 
+  // ── Confirmation de paiement : crédite selon la formule choisie ──
+  const handlePaid = (formule) => {
+    const n = RECHARGE_CREDITS[formule] ?? 0;
+    if (n > 0) setCredits(ajouterCredits(n));
+    setPaid(true);
+  };
+
   const doPivot = async () => {
     if (pivotLoading) return;
     if (credits < CREDITS.PIVOT) {
@@ -1497,7 +1873,14 @@ export default function App() {
       <style>{GLOBAL_STYLES}</style>
       <PaperBG/>
 
-      <Header credits={credits}/>
+      <Header credits={credits} onCreditsClick={() => setShowOffres(true)}/>
+
+      <OffresModal
+        open={showOffres}
+        onClose={() => setShowOffres(false)}
+        onPaid={handlePaid}
+        credits={credits}
+      />
 
       <div style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>
 
@@ -1733,7 +2116,7 @@ export default function App() {
                   </div>
                 </div>
               </>}
-            </> : <BlurPaywall content={cvOpt} onPaid={() => setPaid(true)}/>}
+            </> : <BlurPaywall content={cvOpt} onPaid={handlePaid}/>}
           </div>}
         </Card>}
 
@@ -1795,7 +2178,7 @@ export default function App() {
                   </div>
                 </div>
               </>}
-            </> : <BlurPaywall content={lettre} onPaid={() => setPaid(true)}/>}
+            </> : <BlurPaywall content={lettre} onPaid={handlePaid}/>}
           </div>}
         </Card>}
 
@@ -1806,35 +2189,66 @@ export default function App() {
             background: C.bgCard,
             border: `1px solid ${C.accent}55`,
             borderRadius: "14px",
-            padding: "28px",
+            padding: "28px 24px",
             textAlign: "center",
             fontFamily: FONT_SANS,
           }}>
             <div style={{ fontSize: "40px", marginBottom: "12px" }}>🎟️</div>
             <h3 style={{
               fontSize: "22px", fontWeight: 700, color: C.text,
-              marginBottom: "10px", fontFamily: FONT_SERIF, margin: "0 0 10px",
+              fontFamily: FONT_SERIF, margin: "0 0 10px",
             }}>
               Vos vérifications gratuites sont épuisées
             </h3>
             <p style={{
-              fontSize: "16px", color: C.textSecondary, marginBottom: "20px",
+              fontSize: "16px", color: C.textSecondary,
               maxWidth: "440px", margin: "0 auto 20px", lineHeight: 1.6,
             }}>
-              Passez à l'abonnement mensuel à 19 €/mois (sans engagement) pour continuer à optimiser vos candidatures.
+              Choisissez la formule qui vous convient pour continuer à optimiser vos candidatures :
             </p>
-            <a href={STRIPE_MENSUEL} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", display: "inline-block", maxWidth: "320px", width: "100%" }}>
-              <div style={{
-                minHeight: "60px",
-                padding: "18px 28px",
-                background: C.accent, color: "#FFF",
-                fontSize: "17px", fontWeight: 700,
-                borderRadius: "12px",
-                boxShadow: "0 4px 12px rgba(168,93,44,0.25)",
-              }}>
-                Démarrer à 19 € / mois
-              </div>
-            </a>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "420px", margin: "0 auto" }}>
+              <a href={STRIPE_ANNUEL} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                <div style={{
+                  padding: "16px 20px",
+                  background: C.accent, color: "#FFF",
+                  fontSize: "16px", fontWeight: 700,
+                  borderRadius: "12px", position: "relative",
+                  boxShadow: "0 4px 12px rgba(168,93,44,0.25)",
+                }}>
+                  <div style={{ position: "absolute", top: "-10px", right: "16px", background: C.success, color: "#FFF", fontSize: "11px", padding: "3px 10px", borderRadius: "10px", fontWeight: 700 }}>
+                    ★ Meilleure offre
+                  </div>
+                  Annuel — 24,99 € (120 crédits)
+                </div>
+              </a>
+              <a href={STRIPE_MENSUEL} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                <div style={{
+                  padding: "14px 20px",
+                  background: C.bgCard, color: C.primary,
+                  border: `2px solid ${C.primary}`,
+                  fontSize: "15px", fontWeight: 600,
+                  borderRadius: "12px",
+                }}>
+                  Mensuel — 2,99 € / mois (10 crédits / mois)
+                </div>
+              </a>
+              <a href={STRIPE_RECHARGE} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+                <div style={{
+                  padding: "14px 20px",
+                  background: C.bgCard, color: C.textSecondary,
+                  border: `1px solid ${C.borderStrong}`,
+                  fontSize: "14px", fontWeight: 600,
+                  borderRadius: "12px",
+                }}>
+                  Recharge ponctuelle — 1,99 € (5 crédits)
+                </div>
+              </a>
+            </div>
+
+            <div style={{ fontSize: "12px", color: C.textMuted, marginTop: "16px", fontStyle: "italic" }}>
+              🔒 Paiement sécurisé Stripe · Sans engagement
+            </div>
           </div>
         )}
 

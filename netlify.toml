@@ -1,0 +1,15 @@
+# Configuration Netlify pour Recrutable Senior
+# Permet à Netlify de trouver les fonctions serverless
+
+[build]
+  publish = "dist"
+  command = "npm run build"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

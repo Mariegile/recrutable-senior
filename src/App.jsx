@@ -173,6 +173,46 @@ function ajouterCredits(n) {
   } catch { return n; }
 }
 
+// ── Détection retour Stripe + anti-doublon via session_id ──────────
+const USED_SESSIONS_KEY = "recrutable_used_sessions";
+const FORMULES_VALIDES = ["mensuel", "annuel", "recharge"];
+
+function detectRetourStripe() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const paid = params.get("paid");
+    const sessionId = params.get("session_id");
+
+    // Pas de paramètre paid => rien à faire
+    if (!paid) return null;
+
+    // Toujours nettoyer l'URL pour ne pas re-créditer en cas de rechargement
+    const cleanUrl = () => window.history.replaceState({}, "", window.location.pathname);
+
+    // Formule inconnue => on ignore et on nettoie
+    if (!FORMULES_VALIDES.includes(paid)) { cleanUrl(); return null; }
+
+    // session_id invalide (pas une vraie session Stripe) => on ignore
+    if (!sessionId || !sessionId.startsWith("cs_") || sessionId.length < 20) {
+      cleanUrl();
+      return null;
+    }
+
+    // Vérifier que ce session_id n'a pas déjà été utilisé
+    const used = JSON.parse(localStorage.getItem(USED_SESSIONS_KEY) || "[]");
+    if (used.includes(sessionId)) { cleanUrl(); return null; }
+
+    // Marquer le session_id comme utilisé (garder les 100 derniers)
+    used.push(sessionId);
+    localStorage.setItem(USED_SESSIONS_KEY, JSON.stringify(used.slice(-100)));
+
+    cleanUrl();
+    return paid;
+  } catch {
+    return null;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════
 //   PDF — Détection texte vs scan photo
 // ═══════════════════════════════════════════════════════════════════
@@ -444,6 +484,67 @@ function PaperBG() {
         radial-gradient(ellipse at bottom right, rgba(27,58,92,0.04), transparent 60%)
       `,
     }}/>
+  );
+}
+
+// ── Bannière de bienvenue après paiement Stripe réussi ─────────────
+function PaymentSuccessBanner({ formule, credits, onClose }) {
+  const config = {
+    mensuel:  { label: "Abonnement mensuel",  ajout: 10,  emoji: "🎉" },
+    annuel:   { label: "Abonnement annuel",   ajout: 120, emoji: "🎊" },
+    recharge: { label: "Recharge",            ajout: 5,   emoji: "⚡" },
+  }[formule];
+
+  if (!config) return null;
+
+  // Auto-fermeture après 10 secondes
+  useEffect(() => {
+    const t = setTimeout(onClose, 10000);
+    return () => clearTimeout(t);
+  }, [onClose]);
+
+  return (
+    <div style={{
+      position: "fixed", top: "20px", left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 10000,
+      maxWidth: "520px", width: "calc(100% - 32px)",
+      background: C.bgCard,
+      border: `2px solid ${C.success}`,
+      borderRadius: "14px",
+      boxShadow: "0 12px 40px rgba(30,107,71,0.25)",
+      padding: "18px 22px",
+      display: "flex", alignItems: "flex-start", gap: "14px",
+      fontFamily: FONT_SANS,
+      animation: "fadeIn 0.4s ease",
+    }}>
+      <div style={{ fontSize: "36px", lineHeight: 1, flexShrink: 0 }}>
+        {config.emoji}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: "17px", fontWeight: 700, color: C.success, fontFamily: FONT_SERIF, marginBottom: "4px" }}>
+          Paiement reçu — merci !
+        </div>
+        <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.5 }}>
+          Votre <strong>{config.label}</strong> est activé.
+          <br/>
+          <strong style={{ color: C.success }}>+{config.ajout} crédits</strong> ajoutés à votre compte
+          {" "}(total : <strong>{credits}</strong> crédits disponibles).
+        </div>
+      </div>
+      <button
+        onClick={onClose}
+        aria-label="Fermer"
+        style={{
+          background: "transparent", border: "none",
+          fontSize: "22px", color: C.textMuted,
+          cursor: "pointer", padding: "0 4px",
+          fontWeight: 700, flexShrink: 0,
+        }}
+      >
+        ✕
+      </button>
+    </div>
   );
 }
 
@@ -1066,12 +1167,11 @@ function PreviewBanner() {
 }
 
 // ── Paywall — clair, rassurant, prix bien visibles ──────────────────
-function BlurPaywall({ content, onPaid }) {
+function BlurPaywall({ content }) {
   const lines   = content.split("\n");
   const preview = lines.slice(0, 4).join("\n");
   const hidden  = lines.slice(4).join("\n");
   const [selected, setSelected] = useState("annuel");
-  const [showConfirm, setShowConfirm] = useState(false);
 
   const FORMULES = {
     annuel: {
@@ -1236,84 +1336,23 @@ function BlurPaywall({ content, onPaid }) {
             Paiement 100 % sécurisé par Stripe
           </div>
 
-          {/* Bouton « J'ai déjà payé » — révèle la confirmation */}
-          {!showConfirm && (
-            <button
-              onClick={() => setShowConfirm(true)}
-              style={{
-                marginTop: "14px",
-                background: "transparent",
-                border: `1px solid ${C.border}`,
-                color: C.textMuted,
-                fontSize: "13px", padding: "8px 18px",
-                borderRadius: "8px", cursor: "pointer",
-                fontFamily: FONT_SANS, fontWeight: 500,
-              }}
-            >
-              J'ai déjà payé — débloquer mon accès
-            </button>
-          )}
-
-          {showConfirm && (
-            <div style={{
-              marginTop: "16px",
-              width: "100%", maxWidth: "500px",
-              background: C.bgCard,
-              border: `2px solid ${C.primary}`,
-              borderRadius: "12px",
-              padding: "18px 20px",
-              textAlign: "center",
-            }}>
-              <div style={{ fontSize: "15px", fontWeight: 700, color: C.primary, marginBottom: "12px" }}>
-                Quelle formule avez-vous payée ?
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <button
-                  onClick={() => onPaid("annuel")}
-                  style={{
-                    padding: "12px 16px", borderRadius: "10px",
-                    border: `2px solid ${C.success}`, background: C.successSoft, color: C.success,
-                    fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_SANS,
-                  }}
-                >
-                  Annuel 24,99 € → recevoir 120 crédits
-                </button>
-                <button
-                  onClick={() => onPaid("mensuel")}
-                  style={{
-                    padding: "12px 16px", borderRadius: "10px",
-                    border: `2px solid ${C.primary}`, background: C.primarySoft, color: C.primary,
-                    fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_SANS,
-                  }}
-                >
-                  Mensuel 2,99 € → recevoir 10 crédits
-                </button>
-                <button
-                  onClick={() => onPaid("recharge")}
-                  style={{
-                    padding: "12px 16px", borderRadius: "10px",
-                    border: `2px solid ${C.accent}`, background: C.accentSoft, color: C.accent,
-                    fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_SANS,
-                  }}
-                >
-                  Recharge 1,99 € → recevoir 5 crédits
-                </button>
-                <button
-                  onClick={() => setShowConfirm(false)}
-                  style={{
-                    padding: "8px", marginTop: "4px",
-                    background: "transparent", border: "none", color: C.textMuted,
-                    fontSize: "13px", cursor: "pointer", fontFamily: FONT_SANS,
-                  }}
-                >
-                  Annuler
-                </button>
-              </div>
-              <div style={{ fontSize: "11px", color: C.textMuted, marginTop: "10px", fontStyle: "italic" }}>
-                Vous recevrez aussi un email de confirmation de Stripe.
-              </div>
-            </div>
-          )}
+          {/* Info paiement automatique */}
+          <div style={{
+            marginTop: "14px",
+            background: C.successSoft,
+            border: `1px solid ${C.success}33`,
+            borderRadius: "10px",
+            padding: "10px 16px",
+            fontSize: "13px",
+            color: C.textSecondary,
+            textAlign: "center",
+            maxWidth: "500px",
+            lineHeight: 1.5,
+          }}>
+            ✓ Vos crédits seront <strong>ajoutés automatiquement</strong> dès le paiement validé.
+            <br/>
+            Un problème ? <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: C.primary, fontWeight: 600 }}>{SUPPORT_EMAIL}</a>
+          </div>
         </div>
       </div>
     </div>
@@ -1402,8 +1441,7 @@ function Footer() {
 }
 
 // ── Modal des offres : ouverte depuis le badge des crédits ─────────
-function OffresModal({ open, onClose, onPaid, credits }) {
-  const [showConfirm, setShowConfirm] = useState(false);
+function OffresModal({ open, onClose, credits }) {
 
   // Empêche le scroll du body quand le modal est ouvert
   useEffect(() => {
@@ -1589,77 +1627,21 @@ function OffresModal({ open, onClose, onPaid, credits }) {
           🔒 Paiement 100 % sécurisé · Sans engagement · RGPD
         </div>
 
-        {/* Bouton « J'ai déjà payé » */}
-        {!showConfirm ? (
-          <button
-            onClick={() => setShowConfirm(true)}
-            style={{
-              width: "100%",
-              background: "transparent",
-              border: `1px solid ${C.borderStrong}`,
-              color: C.textSecondary,
-              fontSize: "14px", padding: "12px 18px",
-              borderRadius: "10px", cursor: "pointer",
-              fontFamily: FONT_SANS, fontWeight: 600,
-            }}
-          >
-            J'ai déjà payé — recevoir mes crédits
-          </button>
-        ) : (
-          <div style={{
-            background: C.bgSubtle,
-            border: `2px solid ${C.primary}`,
-            borderRadius: "12px",
-            padding: "16px 18px",
-            textAlign: "center",
-          }}>
-            <div style={{ fontSize: "14px", fontWeight: 700, color: C.primary, marginBottom: "12px" }}>
-              Quelle formule avez-vous payée ?
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <button
-                onClick={() => { onPaid("annuel"); onClose(); }}
-                style={{
-                  padding: "12px 16px", borderRadius: "10px",
-                  border: `2px solid ${C.success}`, background: C.successSoft, color: C.success,
-                  fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_SANS,
-                }}
-              >
-                Annuel 24,99 € → +120 crédits
-              </button>
-              <button
-                onClick={() => { onPaid("mensuel"); onClose(); }}
-                style={{
-                  padding: "12px 16px", borderRadius: "10px",
-                  border: `2px solid ${C.primary}`, background: C.primarySoft, color: C.primary,
-                  fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_SANS,
-                }}
-              >
-                Mensuel 2,99 € → +10 crédits
-              </button>
-              <button
-                onClick={() => { onPaid("recharge"); onClose(); }}
-                style={{
-                  padding: "12px 16px", borderRadius: "10px",
-                  border: `2px solid ${C.accent}`, background: C.accentSoft, color: C.accent,
-                  fontSize: "14px", fontWeight: 700, cursor: "pointer", fontFamily: FONT_SANS,
-                }}
-              >
-                Recharge 1,99 € → +5 crédits
-              </button>
-              <button
-                onClick={() => setShowConfirm(false)}
-                style={{
-                  padding: "8px", marginTop: "2px",
-                  background: "transparent", border: "none", color: C.textMuted,
-                  fontSize: "13px", cursor: "pointer", fontFamily: FONT_SANS,
-                }}
-              >
-                Annuler
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Info paiement automatique */}
+        <div style={{
+          background: C.successSoft,
+          border: `1px solid ${C.success}33`,
+          borderRadius: "10px",
+          padding: "12px 16px",
+          fontSize: "13px",
+          color: C.textSecondary,
+          textAlign: "center",
+          lineHeight: 1.5,
+        }}>
+          ✓ Vos crédits seront <strong>ajoutés automatiquement</strong> dès le paiement validé.
+          <br/>
+          Un problème ? Écrivez-nous : <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: C.primary, fontWeight: 600 }}>{SUPPORT_EMAIL}</a>
+        </div>
       </div>
     </div>
   );
@@ -1695,8 +1677,23 @@ export default function App() {
   const [pivotLoading, setPivotLoading]     = useState(false);
   const [pivotError, setPivotError]         = useState("");
   const [showPivot, setShowPivot]           = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(null);
 
   useEffect(() => { loadPdfJs().catch(() => {}); }, []);
+
+  // ── Au chargement : détecte le retour de paiement Stripe ──────────
+  useEffect(() => {
+    const formule = detectRetourStripe();
+    if (formule) {
+      const n = RECHARGE_CREDITS[formule] ?? 0;
+      if (n > 0) {
+        const nouveauTotal = ajouterCredits(n);
+        setCredits(nouveauTotal);
+        setPaid(true);
+        setPaymentSuccess(formule);
+      }
+    }
+  }, []);
 
   const hasCV    = cvText.trim().length >= LIMITS.CV_MIN || (!!cvPdf && cvPdfInfo && !cvPdfInfo.estPhoto);
   const hasOffre = offreText.trim().length >= LIMITS.OFFRE_MIN || (!!offrePdf && offrePdfInfo && !offrePdfInfo.estPhoto);
@@ -1875,10 +1872,17 @@ export default function App() {
 
       <Header credits={credits} onCreditsClick={() => setShowOffres(true)}/>
 
+      {paymentSuccess && (
+        <PaymentSuccessBanner
+          formule={paymentSuccess}
+          credits={credits}
+          onClose={() => setPaymentSuccess(null)}
+        />
+      )}
+
       <OffresModal
         open={showOffres}
         onClose={() => setShowOffres(false)}
-        onPaid={handlePaid}
         credits={credits}
       />
 
@@ -2089,34 +2093,32 @@ export default function App() {
             <PreviewBanner/>
             <div style={{ height: "16px" }}/>
 
-            {paid ? <>
-              <StreamingText text={cvOpt} isStreaming={cvOptStreaming}/>
+            <StreamingText text={cvOpt} isStreaming={cvOptStreaming}/>
 
-              {!cvOptStreaming && <>
-                <div style={{ display: "flex", gap: "12px", marginTop: "20px", flexWrap: "wrap" }}>
-                  <CopyBtn text={cvOpt}/>
-                </div>
+            {!cvOptStreaming && <>
+              <div style={{ display: "flex", gap: "12px", marginTop: "20px", flexWrap: "wrap" }}>
+                <CopyBtn text={cvOpt}/>
+              </div>
 
-                <div style={{ marginTop: "16px" }}>
-                  <PrimaryBtn onClick={() => downloadCV(cvOpt, secteur)} icon="⬇️" variant="success">
-                    Télécharger mon CV au format imprimable
+              <div style={{ marginTop: "16px" }}>
+                <PrimaryBtn onClick={() => downloadCV(cvOpt, secteur)} icon="⬇️" variant="success">
+                  Télécharger mon CV au format imprimable
+                </PrimaryBtn>
+              </div>
+
+              <p style={{ fontSize: "14px", color: C.textMuted, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
+                Le fichier s'ouvrira dans votre navigateur. Ajoutez vos coordonnées en haut, puis cliquez sur <strong>Fichier → Imprimer → Enregistrer au format PDF</strong>.
+              </p>
+
+              <div style={{ display: "flex", gap: "12px", marginTop: "24px", flexWrap: "wrap" }}>
+                <SecondaryBtn onClick={() => setStep(3)}>← Analyse</SecondaryBtn>
+                <div style={{ flex: 1, minWidth: "240px" }}>
+                  <PrimaryBtn onClick={doLettre} loading={loading} icon="✉️" variant="primary">
+                    Générer ma lettre — 1 vérification
                   </PrimaryBtn>
                 </div>
-
-                <p style={{ fontSize: "14px", color: C.textMuted, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
-                  Le fichier s'ouvrira dans votre navigateur. Ajoutez vos coordonnées en haut, puis cliquez sur <strong>Fichier → Imprimer → Enregistrer au format PDF</strong>.
-                </p>
-
-                <div style={{ display: "flex", gap: "12px", marginTop: "24px", flexWrap: "wrap" }}>
-                  <SecondaryBtn onClick={() => setStep(3)}>← Analyse</SecondaryBtn>
-                  <div style={{ flex: 1, minWidth: "240px" }}>
-                    <PrimaryBtn onClick={doLettre} loading={loading} icon="✉️" variant="primary">
-                      Générer ma lettre — 1 vérification
-                    </PrimaryBtn>
-                  </div>
-                </div>
-              </>}
-            </> : <BlurPaywall content={cvOpt} onPaid={handlePaid}/>}
+              </div>
+            </>}
           </div>}
         </Card>}
 
@@ -2133,52 +2135,50 @@ export default function App() {
             <PreviewBanner/>
             <div style={{ height: "16px" }}/>
 
-            {paid ? <>
-              <StreamingText text={lettre} isStreaming={lettreStreaming}/>
+            <StreamingText text={lettre} isStreaming={lettreStreaming}/>
 
-              {!lettreStreaming && <>
-                <div style={{ display: "flex", gap: "12px", marginTop: "20px", flexWrap: "wrap" }}>
-                  <CopyBtn text={lettre}/>
+            {!lettreStreaming && <>
+              <div style={{ display: "flex", gap: "12px", marginTop: "20px", flexWrap: "wrap" }}>
+                <CopyBtn text={lettre}/>
+              </div>
+
+              <div style={{ marginTop: "16px" }}>
+                <PrimaryBtn onClick={() => downloadLettre(lettre)} icon="⬇️" variant="success">
+                  Télécharger ma lettre au format imprimable
+                </PrimaryBtn>
+              </div>
+
+              <p style={{ fontSize: "14px", color: C.textMuted, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
+                Cliquez sur <strong>Fichier → Imprimer → Enregistrer au format PDF</strong> pour obtenir le PDF final.
+              </p>
+
+              <div style={{
+                marginTop: "32px",
+                background: C.successSoft,
+                border: `1px solid ${C.success}40`,
+                borderRadius: "14px",
+                padding: "24px 26px",
+                fontFamily: FONT_SANS,
+              }}>
+                <div style={{ fontSize: "20px", fontWeight: 700, color: C.success, marginBottom: "14px", fontFamily: FONT_SERIF }}>
+                  🎉 Votre dossier de candidature est complet
                 </div>
+                <div style={{ fontSize: "16px", color: C.text, lineHeight: 2 }}>
+                  ✓ Score de compatibilité : <strong style={{ color: C.success }}>{analyse?.score}%</strong><br/>
+                  ✓ CV optimisé sur 1 page avec {analyse?.motsManquants?.length ?? 0} mots-clés ajoutés<br/>
+                  ✓ Lettre de motivation personnalisée
+                </div>
+              </div>
 
-                <div style={{ marginTop: "16px" }}>
-                  <PrimaryBtn onClick={() => downloadLettre(lettre)} icon="⬇️" variant="success">
-                    Télécharger ma lettre au format imprimable
+              <div style={{ display: "flex", gap: "12px", marginTop: "24px", flexWrap: "wrap" }}>
+                <SecondaryBtn onClick={() => setStep(4)}>← CV</SecondaryBtn>
+                <div style={{ flex: 1, minWidth: "240px" }}>
+                  <PrimaryBtn onClick={reset} icon="🔄" variant="primary">
+                    Préparer une nouvelle candidature
                   </PrimaryBtn>
                 </div>
-
-                <p style={{ fontSize: "14px", color: C.textMuted, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
-                  Cliquez sur <strong>Fichier → Imprimer → Enregistrer au format PDF</strong> pour obtenir le PDF final.
-                </p>
-
-                <div style={{
-                  marginTop: "32px",
-                  background: C.successSoft,
-                  border: `1px solid ${C.success}40`,
-                  borderRadius: "14px",
-                  padding: "24px 26px",
-                  fontFamily: FONT_SANS,
-                }}>
-                  <div style={{ fontSize: "20px", fontWeight: 700, color: C.success, marginBottom: "14px", fontFamily: FONT_SERIF }}>
-                    🎉 Votre dossier de candidature est complet
-                  </div>
-                  <div style={{ fontSize: "16px", color: C.text, lineHeight: 2 }}>
-                    ✓ Score de compatibilité : <strong style={{ color: C.success }}>{analyse?.score}%</strong><br/>
-                    ✓ CV optimisé sur 1 page avec {analyse?.motsManquants?.length ?? 0} mots-clés ajoutés<br/>
-                    ✓ Lettre de motivation personnalisée
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", gap: "12px", marginTop: "24px", flexWrap: "wrap" }}>
-                  <SecondaryBtn onClick={() => setStep(4)}>← CV</SecondaryBtn>
-                  <div style={{ flex: 1, minWidth: "240px" }}>
-                    <PrimaryBtn onClick={reset} icon="🔄" variant="primary">
-                      Préparer une nouvelle candidature
-                    </PrimaryBtn>
-                  </div>
-                </div>
-              </>}
-            </> : <BlurPaywall content={lettre} onPaid={handlePaid}/>}
+              </div>
+            </>}
           </div>}
         </Card>}
 

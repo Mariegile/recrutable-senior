@@ -101,6 +101,25 @@ const THEMES = {
 
 const SECTEURS_VALIDES = ["finance","sante","tech","commerce","rh","btp","education","restauration","default"];
 
+// Thèmes de couleur que l'utilisateur peut choisir manuellement (édition contrôlée)
+const THEMES_CHOISISSABLES = [
+  { id: "auto",       label: "Automatique", primary: null,      accent: null },
+  { id: "marine",     label: "Bleu marine", primary: "#1B3A5C", accent: "#A85D2C" },
+  { id: "anthracite", label: "Anthracite",  primary: "#2B2B2B", accent: "#6B7280" },
+  { id: "vert",       label: "Vert sobre",  primary: "#0F3D2D", accent: "#1E8A4F" },
+  { id: "bordeaux",   label: "Bordeaux",    primary: "#4A1521", accent: "#A8455C" },
+  { id: "nuit",       label: "Bleu nuit",   primary: "#0A2540", accent: "#C9A85D" },
+];
+
+// Ordre + libellés des sections masquables
+const SECTIONS_CV = [
+  { id: "profil",      label: "Profil" },
+  { id: "experiences", label: "Expériences" },
+  { id: "formations",  label: "Formation" },
+  { id: "competences", label: "Compétences" },
+  { id: "langues",     label: "Langues" },
+];
+
 // ═══════════════════════════════════════════════════════════════════
 //   SÉCURITÉ
 // ═══════════════════════════════════════════════════════════════════
@@ -509,8 +528,13 @@ function cvVersTexte(cv) {
 
 // Génère le HTML complet du CV à partir du CV structuré (aperçu ET téléchargement)
 function genererCvHtml(cv, secteur, opts = {}) {
-  const { avecPhoto = false, pourImpression = false } = opts;
-  const t = THEMES[secteur] || THEMES.default;
+  const { avecPhoto = false, pourImpression = false, couleurCustom = null, sectionsMasquees = [] } = opts;
+  // Thème : couleur personnalisée choisie par l'utilisateur, sinon thème du secteur
+  const base = THEMES[secteur] || THEMES.default;
+  const t = couleurCustom
+    ? { primary: couleurCustom.primary, accent: couleurCustom.accent, font: base.font }
+    : base;
+  const masquee = (id) => sectionsMasquees.includes(id);
 
   // Bloc photo (cadre vide) — seulement si demandé
   const photoBloc = avecPhoto ? `
@@ -585,11 +609,11 @@ html,body{width:210mm;font-family:${t.font};color:#222;background:#fff;font-size
 @media print{.hint,.footer-note{display:none}[contenteditable]{border-bottom:none}}`;
 
   const mainSections = [
-    profilHtml ? `<div class="section-title">Profil</div>${profilHtml}` : "",
-    expHtml ? `<div class="section-title">Expériences</div>${expHtml}` : "",
-    formHtml ? `<div class="section-title">Formation</div>${formHtml}` : "",
-    compHtml ? `<div class="section-title">Compétences</div>${compHtml}` : "",
-    langHtml ? `<div class="section-title">Langues</div>${langHtml}` : "",
+    (profilHtml && !masquee("profil")) ? `<div class="section-title">Profil</div>${profilHtml}` : "",
+    (expHtml && !masquee("experiences")) ? `<div class="section-title">Expériences</div>${expHtml}` : "",
+    (formHtml && !masquee("formations")) ? `<div class="section-title">Formation</div>${formHtml}` : "",
+    (compHtml && !masquee("competences")) ? `<div class="section-title">Compétences</div>${compHtml}` : "",
+    (langHtml && !masquee("langues")) ? `<div class="section-title">Langues</div>${langHtml}` : "",
   ].join("");
 
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>CV ${esc(cv.nom)}</title>
@@ -597,8 +621,9 @@ html,body{width:210mm;font-family:${t.font};color:#222;background:#fff;font-size
 <body><div class="page"><div class="top-bar"><div class="candidate-name">${esc(cv.nom)}</div><div class="candidate-title">${esc(cv.titre)}</div></div><div class="layout"><div class="sidebar">${photoBloc}${hintBloc}<div class="section-title">Contact</div>${ligneContact("📧", cv.contact.email, "votre@email.com")}${ligneContact("📞", cv.contact.telephone, "06 XX XX XX XX")}${ligneContact("📍", cv.contact.ville, "Votre ville")}${ligneContact("🔗", cv.contact.linkedin, "linkedin.com/in/profil")}</div><div class="main">${mainSections}</div></div>${footerBloc}</div></body></html>`;
 }
 
-function downloadCV(cv, secteur, avecPhoto = false) {
-  const doc = genererCvHtml(cv, secteur, { avecPhoto, pourImpression: false });
+function downloadCV(cv, secteur, opts = {}) {
+  const { avecPhoto = false, couleurCustom = null, sectionsMasquees = [] } = opts;
+  const doc = genererCvHtml(cv, secteur, { avecPhoto, pourImpression: false, couleurCustom, sectionsMasquees });
   const blob = new Blob([doc], { type: "text/html;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a"); a.href = url;
@@ -1342,7 +1367,7 @@ function StreamingText({ text, isStreaming }) {
 }
 
 // ── Aperçu fidèle du CV : le vrai document A4 mis en page ──────────
-function CVPreview({ cv, secteur, avecPhoto }) {
+function CVPreview({ cv, secteur, avecPhoto, couleurCustom, sectionsMasquees }) {
   const wrapRef = useRef(null);
   const [scale, setScale] = useState(0.5);
 
@@ -1360,7 +1385,11 @@ function CVPreview({ cv, secteur, avecPhoto }) {
     return () => window.removeEventListener("resize", calcScale);
   }, []);
 
-  const html = genererCvHtml(cv, secteur, { avecPhoto, pourImpression: true });
+  const html = genererCvHtml(cv, secteur, {
+    avecPhoto, pourImpression: true,
+    couleurCustom: couleurCustom || null,
+    sectionsMasquees: sectionsMasquees || [],
+  });
 
   return (
     <div ref={wrapRef} style={{ width: "100%", fontFamily: FONT_SANS }}>
@@ -1391,6 +1420,274 @@ function CVPreview({ cv, secteur, avecPhoto }) {
       }}>
         Aperçu réel de votre CV — c'est exactement ce que vous allez télécharger.
       </p>
+    </div>
+  );
+}
+
+
+// ── Édition contrôlée : barre d'outils (couleur + sections) ─────────
+function BarreEdition({ couleurId, onCouleur, sectionsMasquees, onToggleSection,
+                        modeTexte, onToggleTexte, onReset, peutReset }) {
+  return (
+    <div style={{
+      background: C.bgCard,
+      border: `1px solid ${C.border}`,
+      borderRadius: "14px",
+      padding: "20px 22px",
+      marginBottom: "20px",
+      fontFamily: FONT_SANS,
+    }}>
+      <div style={{ fontSize: "16px", fontWeight: 700, color: C.text, marginBottom: "16px" }}>
+        🎨 Personnaliser mon CV
+      </div>
+
+      {/* Couleurs */}
+      <div style={{ marginBottom: "18px" }}>
+        <div style={{ fontSize: "14px", fontWeight: 600, color: C.textSecondary, marginBottom: "10px" }}>
+          Couleur du CV
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+          {THEMES_CHOISISSABLES.map(th => {
+            const sel = couleurId === th.id;
+            const pastille = th.id === "auto" ? C.textMuted : th.primary;
+            return (
+              <button
+                key={th.id}
+                onClick={() => onCouleur(th.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: "8px",
+                  padding: "8px 14px",
+                  borderRadius: "10px",
+                  border: `2px solid ${sel ? C.primary : C.border}`,
+                  background: sel ? C.primarySoft : C.bgCard,
+                  cursor: "pointer",
+                  fontFamily: FONT_SANS,
+                  fontSize: "14px",
+                  fontWeight: sel ? 700 : 500,
+                  color: sel ? C.primary : C.textSecondary,
+                }}
+              >
+                <span style={{
+                  width: "18px", height: "18px", borderRadius: "50%",
+                  background: th.id === "auto"
+                    ? "linear-gradient(135deg,#1B3A5C,#A85D2C)"
+                    : pastille,
+                  border: `1px solid rgba(0,0,0,0.15)`, flexShrink: 0,
+                }}/>
+                {th.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Sections à afficher */}
+      <div style={{ marginBottom: "18px" }}>
+        <div style={{ fontSize: "14px", fontWeight: 600, color: C.textSecondary, marginBottom: "10px" }}>
+          Sections affichées
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
+          {SECTIONS_CV.map(s => {
+            const visible = !sectionsMasquees.includes(s.id);
+            return (
+              <button
+                key={s.id}
+                onClick={() => onToggleSection(s.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: "8px",
+                  padding: "8px 14px",
+                  borderRadius: "10px",
+                  border: `2px solid ${visible ? C.success : C.border}`,
+                  background: visible ? C.successSoft : C.bgSubtle,
+                  cursor: "pointer",
+                  fontFamily: FONT_SANS,
+                  fontSize: "14px",
+                  fontWeight: 600,
+                  color: visible ? C.success : C.textMuted,
+                }}
+              >
+                <span style={{ fontSize: "15px" }}>{visible ? "👁️" : "🚫"}</span>
+                {s.label}
+              </button>
+            );
+          })}
+        </div>
+        <p style={{ fontSize: "12px", color: C.textMuted, marginTop: "8px", marginBottom: 0 }}>
+          Cliquez sur une section pour l'afficher ou la masquer.
+        </p>
+      </div>
+
+      {/* Corriger le texte + Réinitialiser */}
+      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", paddingTop: "14px", borderTop: `1px solid ${C.border}` }}>
+        <button
+          onClick={onToggleTexte}
+          style={{
+            padding: "10px 18px",
+            borderRadius: "10px",
+            border: `2px solid ${modeTexte ? C.primary : C.borderStrong}`,
+            background: modeTexte ? C.primarySoft : C.bgCard,
+            color: modeTexte ? C.primary : C.textSecondary,
+            fontSize: "14px", fontWeight: 600, fontFamily: FONT_SANS,
+            cursor: "pointer",
+          }}
+        >
+          {modeTexte ? "✓ Modification du texte activée" : "✏️ Corriger le texte"}
+        </button>
+        {peutReset && (
+          <button
+            onClick={onReset}
+            style={{
+              padding: "10px 18px",
+              borderRadius: "10px",
+              border: `2px solid ${C.borderStrong}`,
+              background: C.bgCard,
+              color: C.textMuted,
+              fontSize: "14px", fontWeight: 600, fontFamily: FONT_SANS,
+              cursor: "pointer",
+            }}
+          >
+            ↩️ Revenir à la version d'origine
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Éditeur de texte du CV (champs clairs, mise à jour en direct) ───
+function EditeurTexteCV({ cv, onChange }) {
+  // Met à jour un champ simple
+  const setChamp = (cle, valeur) => onChange({ ...cv, [cle]: valeur });
+  const setContact = (cle, valeur) => onChange({ ...cv, contact: { ...cv.contact, [cle]: valeur } });
+
+  // Met à jour une expérience
+  const setExp = (idx, cle, valeur) => {
+    const experiences = cv.experiences.map((e, i) => i === idx ? { ...e, [cle]: valeur } : e);
+    onChange({ ...cv, experiences });
+  };
+  const setTache = (idxExp, idxTache, valeur) => {
+    const experiences = cv.experiences.map((e, i) => {
+      if (i !== idxExp) return e;
+      const taches = e.taches.map((t, j) => j === idxTache ? valeur : t);
+      return { ...e, taches };
+    });
+    onChange({ ...cv, experiences });
+  };
+
+  // Met à jour une formation
+  const setForm = (idx, cle, valeur) => {
+    const formations = cv.formations.map((f, i) => i === idx ? { ...f, [cle]: valeur } : f);
+    onChange({ ...cv, formations });
+  };
+
+  // Met à jour une compétence / langue
+  const setListe = (cle, idx, valeur) => {
+    const liste = cv[cle].map((x, i) => i === idx ? valeur : x);
+    onChange({ ...cv, [cle]: liste });
+  };
+
+  const champStyle = {
+    width: "100%", padding: "10px 12px", fontSize: "15px",
+    border: `1px solid ${C.inputBorder}`, borderRadius: "8px",
+    fontFamily: FONT_SANS, color: C.text, background: C.inputBg,
+    outline: "none", marginBottom: "8px",
+  };
+  const labelStyle = {
+    fontSize: "13px", fontWeight: 600, color: C.textSecondary,
+    marginBottom: "4px", display: "block",
+  };
+  const blocStyle = {
+    background: C.bgSubtle, border: `1px solid ${C.border}`,
+    borderRadius: "10px", padding: "14px 16px", marginBottom: "12px",
+  };
+  const titreSection = {
+    fontSize: "15px", fontWeight: 700, color: C.primary,
+    margin: "20px 0 10px", fontFamily: FONT_SANS,
+  };
+
+  return (
+    <div style={{
+      background: C.bgCard, border: `1px solid ${C.border}`,
+      borderRadius: "14px", padding: "22px 22px", marginBottom: "20px",
+      fontFamily: FONT_SANS,
+    }}>
+      <div style={{ fontSize: "16px", fontWeight: 700, color: C.text, marginBottom: "6px" }}>
+        ✏️ Corriger le texte de mon CV
+      </div>
+      <p style={{ fontSize: "13px", color: C.textMuted, marginTop: 0, marginBottom: "16px", lineHeight: 1.5 }}>
+        Vos corrections apparaissent aussitôt dans l'aperçu. La mise en page reste protégée.
+      </p>
+
+      {/* Identité */}
+      <label style={labelStyle}>Nom complet</label>
+      <input style={champStyle} value={cv.nom} onChange={e => setChamp("nom", e.target.value)}/>
+      <label style={labelStyle}>Intitulé du poste</label>
+      <input style={champStyle} value={cv.titre} onChange={e => setChamp("titre", e.target.value)}/>
+
+      {/* Contact */}
+      <div style={titreSection}>Coordonnées</div>
+      <label style={labelStyle}>E-mail</label>
+      <input style={champStyle} value={cv.contact.email} onChange={e => setContact("email", e.target.value)}/>
+      <label style={labelStyle}>Téléphone</label>
+      <input style={champStyle} value={cv.contact.telephone} onChange={e => setContact("telephone", e.target.value)}/>
+      <label style={labelStyle}>Ville</label>
+      <input style={champStyle} value={cv.contact.ville} onChange={e => setContact("ville", e.target.value)}/>
+      <label style={labelStyle}>LinkedIn</label>
+      <input style={champStyle} value={cv.contact.linkedin} onChange={e => setContact("linkedin", e.target.value)}/>
+
+      {/* Profil */}
+      <div style={titreSection}>Profil</div>
+      <textarea
+        style={{ ...champStyle, minHeight: "90px", resize: "vertical", lineHeight: 1.5 }}
+        value={cv.profil}
+        onChange={e => setChamp("profil", e.target.value)}
+      />
+
+      {/* Expériences */}
+      {cv.experiences.length > 0 && <div style={titreSection}>Expériences</div>}
+      {cv.experiences.map((e, idx) => (
+        <div key={idx} style={blocStyle}>
+          <label style={labelStyle}>Poste</label>
+          <input style={champStyle} value={e.poste} onChange={ev => setExp(idx, "poste", ev.target.value)}/>
+          <label style={labelStyle}>Entreprise</label>
+          <input style={champStyle} value={e.entreprise} onChange={ev => setExp(idx, "entreprise", ev.target.value)}/>
+          <label style={labelStyle}>Dates</label>
+          <input style={champStyle} value={e.dates} onChange={ev => setExp(idx, "dates", ev.target.value)}/>
+          {e.taches.map((t, j) => (
+            <div key={j}>
+              <label style={labelStyle}>Tâche {j + 1}</label>
+              <textarea
+                style={{ ...champStyle, minHeight: "54px", resize: "vertical", lineHeight: 1.5 }}
+                value={t}
+                onChange={ev => setTache(idx, j, ev.target.value)}
+              />
+            </div>
+          ))}
+        </div>
+      ))}
+
+      {/* Formations */}
+      {cv.formations.length > 0 && <div style={titreSection}>Formation</div>}
+      {cv.formations.map((f, idx) => (
+        <div key={idx} style={blocStyle}>
+          <label style={labelStyle}>Années</label>
+          <input style={champStyle} value={f.annees} onChange={ev => setForm(idx, "annees", ev.target.value)}/>
+          <label style={labelStyle}>Diplôme — Établissement</label>
+          <input style={champStyle} value={f.intitule} onChange={ev => setForm(idx, "intitule", ev.target.value)}/>
+        </div>
+      ))}
+
+      {/* Compétences */}
+      {cv.competences.length > 0 && <div style={titreSection}>Compétences</div>}
+      {cv.competences.map((c, idx) => (
+        <input key={idx} style={champStyle} value={c} onChange={e => setListe("competences", idx, e.target.value)}/>
+      ))}
+
+      {/* Langues */}
+      {cv.langues.length > 0 && <div style={titreSection}>Langues</div>}
+      {cv.langues.map((l, idx) => (
+        <input key={idx} style={champStyle} value={l} onChange={e => setListe("langues", idx, e.target.value)}/>
+      ))}
     </div>
   );
 }
@@ -1904,6 +2201,10 @@ export default function App() {
   const [analyse, setAnalyse]               = useState(null);
   const [cvOpt, setCvOpt]                   = useState(null);
   const [cvOptError, setCvOptError]         = useState("");
+  const [cvEdite, setCvEdite]               = useState(null);
+  const [couleurId, setCouleurId]           = useState("auto");
+  const [sectionsMasquees, setSectionsMasquees] = useState([]);
+  const [modeTexte, setModeTexte]           = useState(false);
   const [lettre, setLettre]                 = useState("");
   const [lettreStreaming, setLettreStreaming] = useState(false);
   const [lettreError, setLettreError]       = useState("");
@@ -1987,7 +2288,8 @@ export default function App() {
       return;
     }
     setLoading(true); setLoadingMsg("Réécriture de votre CV"); setStep(4);
-    setCvOpt(null); setCvOptError("");
+    setCvOpt(null); setCvOptError(""); setCvEdite(null);
+    setCouleurId("auto"); setSectionsMasquees([]); setModeTexte(false);
     const stopProgress = startProgress();
     try {
       let cvContent = "";
@@ -2017,6 +2319,7 @@ export default function App() {
         throw new Error("Le CV généré est incomplet. Réessayez s'il vous plaît.");
       }
       setCvOpt(cv);
+      setCvEdite(cv); // copie de travail pour l'édition contrôlée
       setCredits(depenseCredits(CREDITS.REWRITE));
     } catch (err) {
       setCvOptError(err.message || "Erreur inattendue durant la réécriture.");
@@ -2040,7 +2343,7 @@ export default function App() {
       else if (offreText) offreContent = limiterTexte(offreText, LIMITS.OFFRE_MAX).texte;
 
       const userText = [
-        envelopper("CV", cvOpt ? cvVersTexte(cvOpt) : ""),
+        envelopper("CV", cvEdite ? cvVersTexte(cvEdite) : (cvOpt ? cvVersTexte(cvOpt) : "")),
         envelopper("FICHE_POSTE", offreContent),
       ].filter(Boolean).join("\n\n");
 
@@ -2065,9 +2368,36 @@ export default function App() {
     setStep(1); setCvText(""); setCvPdf(null); setCvPdfInfo(null);
     setOffreText(""); setOffrePdf(null); setOffrePdfInfo(null);
     setAnalyse(null); setCvOpt(null); setCvOptError(""); setLettre(""); setLettreError("");
+    setCvEdite(null); setCouleurId("auto"); setSectionsMasquees([]); setModeTexte(false);
     setSecteur("default"); setLoadingProgress(0);
     setPivots(null); setPivotError(""); setShowPivot(false);
   };
+
+  // ── Édition contrôlée ──────────────────────────────────────────
+  // Couleur choisie : objet {primary,accent} ou null si "auto"
+  const couleurCustom = (() => {
+    const th = THEMES_CHOISISSABLES.find(x => x.id === couleurId);
+    return th && th.primary ? { primary: th.primary, accent: th.accent } : null;
+  })();
+
+  const toggleSection = (id) => {
+    setSectionsMasquees(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const resetEdition = () => {
+    setCvEdite(cvOpt);            // revient au CV généré par l'IA
+    setCouleurId("auto");
+    setSectionsMasquees([]);
+    setModeTexte(false);
+  };
+
+  // Vrai si l'utilisateur a modifié quelque chose (pour afficher le bouton "revenir")
+  const editionModifiee =
+    couleurId !== "auto" ||
+    sectionsMasquees.length > 0 ||
+    (cvEdite && cvOpt && JSON.stringify(cvEdite) !== JSON.stringify(cvOpt));
 
   // ── Confirmation de paiement : crédite selon la formule choisie ──
   const handlePaid = (formule) => {
@@ -2331,8 +2661,14 @@ export default function App() {
           {loading && !cvOpt && <Spinner text={loadingMsg} progress={loadingProgress}/>}
           {!loading && cvOptError && <ErrorBox message={cvOptError} onRetry={doCvOpt} onBack={() => setStep(3)}/>}
 
-          {cvOpt && !cvOptError && !loading && <div>
-            <CVPreview cv={cvOpt} secteur={secteur} avecPhoto={!!cvPdfInfo?.aPhoto}/>
+          {cvOpt && cvEdite && !cvOptError && !loading && <div>
+            <CVPreview
+              cv={cvEdite}
+              secteur={secteur}
+              avecPhoto={!!cvPdfInfo?.aPhoto}
+              couleurCustom={couleurCustom}
+              sectionsMasquees={sectionsMasquees}
+            />
 
             {cvPdfInfo?.aPhoto && (
               <InfoBox kind="info">
@@ -2342,12 +2678,38 @@ export default function App() {
               </InfoBox>
             )}
 
-            <div style={{ display: "flex", gap: "12px", marginTop: "20px", flexWrap: "wrap" }}>
-              <CopyBtn text={cvVersTexte(cvOpt)}/>
+            {/* Barre de personnalisation */}
+            <div style={{ marginTop: "20px" }}>
+              <BarreEdition
+                couleurId={couleurId}
+                onCouleur={setCouleurId}
+                sectionsMasquees={sectionsMasquees}
+                onToggleSection={toggleSection}
+                modeTexte={modeTexte}
+                onToggleTexte={() => setModeTexte(m => !m)}
+                onReset={resetEdition}
+                peutReset={editionModifiee}
+              />
+            </div>
+
+            {/* Éditeur de texte (si activé) */}
+            {modeTexte && (
+              <EditeurTexteCV cv={cvEdite} onChange={setCvEdite}/>
+            )}
+
+            <div style={{ display: "flex", gap: "12px", marginTop: "4px", flexWrap: "wrap" }}>
+              <CopyBtn text={cvVersTexte(cvEdite)}/>
             </div>
 
             <div style={{ marginTop: "16px" }}>
-              <PrimaryBtn onClick={() => downloadCV(cvOpt, secteur, !!cvPdfInfo?.aPhoto)} icon="⬇️" variant="success">
+              <PrimaryBtn
+                onClick={() => downloadCV(cvEdite, secteur, {
+                  avecPhoto: !!cvPdfInfo?.aPhoto,
+                  couleurCustom,
+                  sectionsMasquees,
+                })}
+                icon="⬇️" variant="success"
+              >
                 Télécharger mon CV au format imprimable
               </PrimaryBtn>
             </div>

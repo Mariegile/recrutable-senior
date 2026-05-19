@@ -734,29 +734,52 @@ html,body{width:210mm;font-family:'Calibri','Carlito',Arial,sans-serif;color:#00
 <body><div class="us-page"><div class="us-name">${esc(cv.nom)}</div><div class="us-contact">${contactLigne}</div><div class="us-headline">${esc(cv.titre)}</div><div class="us-main">${sections}</div>${footerBloc}</div></body></html>`;
 }
 
+// Ouvre le document dans une fenêtre d'impression : le navigateur propose
+// directement "Enregistrer en PDF". Le texte reste réel (lisible par les ATS).
+function imprimerDocument(html, titre) {
+  const win = window.open("", "_blank");
+  if (!win) {
+    // Bloqueur de pop-up : on retombe sur le téléchargement HTML classique
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `${titre}.html`; a.click();
+    URL.revokeObjectURL(url);
+    return false;
+  }
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+  // Laisse le temps au rendu (polices, mise en page) avant d'imprimer
+  const lancer = () => {
+    try { win.focus(); win.print(); } catch (e) {}
+  };
+  if (win.document.readyState === "complete") {
+    setTimeout(lancer, 600);
+  } else {
+    win.onload = () => setTimeout(lancer, 600);
+    setTimeout(lancer, 1500); // filet de sécurité si onload ne se déclenche pas
+  }
+  return true;
+}
+
 function downloadCV(cv, secteur, opts = {}) {
   const { avecPhoto = false, couleurCustom = null, sectionsMasquees = [],
           formatUS = false, langue = "francais" } = opts;
+  // pourImpression: true → pas d'encart d'aide, document propre prêt pour le PDF
   const doc = formatUS
-    ? genererCvHtmlUS(cv, { pourImpression: false, sectionsMasquees, langue })
-    : genererCvHtml(cv, secteur, { avecPhoto, pourImpression: false, couleurCustom, sectionsMasquees });
-  const blob = new Blob([doc], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url;
-  a.download = `CV_${prenomPourFichier(cv.nom)}.html`; a.click();
-  URL.revokeObjectURL(url);
+    ? genererCvHtmlUS(cv, { pourImpression: true, sectionsMasquees, langue })
+    : genererCvHtml(cv, secteur, { avecPhoto, pourImpression: true, couleurCustom, sectionsMasquees });
+  return imprimerDocument(doc, `CV_${prenomPourFichier(cv.nom)}`);
 }
 
 function downloadLettre(content) {
   const paragraphes = content.split("\n\n").map(p => p.trim()).filter(Boolean)
     .map(p => `<p>${esc(p).replace(/\n/g, "<br/>")}</p>`).join("\n");
   const doc = `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>Lettre de motivation</title>
-<style>@page{size:A4;margin:28mm 24mm}*{margin:0;padding:0}body{font-family:Georgia,serif;color:#1B2A4A;font-size:11pt;line-height:1.9}.bar{width:100%;height:5px;background:linear-gradient(to right,#1B3A5C,#A85D2C);margin-bottom:30px}.date{text-align:right;color:#888;font-size:10pt;margin-bottom:26px}p{margin-bottom:14px}.note{font-size:7pt;color:#ccc;text-align:center;margin-top:30px;border-top:1px solid #eee;padding-top:8px}@media print{.note{display:none}}</style></head>
-<body><div class="bar"></div><div class="date">${new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})}</div>${paragraphes}<div class="note">💡 Fichier → Imprimer → Enregistrer en PDF</div></body></html>`;
-  const blob = new Blob([doc], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = "Lettre_motivation.html"; a.click();
-  URL.revokeObjectURL(url);
+<style>@page{size:A4;margin:28mm 24mm}*{margin:0;padding:0}body{font-family:Georgia,serif;color:#1B2A4A;font-size:11pt;line-height:1.9}.bar{width:100%;height:5px;background:linear-gradient(to right,#1B3A5C,#A85D2C);margin-bottom:30px}.date{text-align:right;color:#888;font-size:10pt;margin-bottom:26px}p{margin-bottom:14px}</style></head>
+<body><div class="bar"></div><div class="date">${new Date().toLocaleDateString("fr-FR",{day:"numeric",month:"long",year:"numeric"})}</div>${paragraphes}</body></html>`;
+  return imprimerDocument(doc, "Lettre_motivation");
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -3097,12 +3120,12 @@ export default function App() {
                 })}
                 icon="⬇️" variant="success"
               >
-                Télécharger mon CV au format imprimable
+                Télécharger mon CV en PDF
               </PrimaryBtn>
             </div>
 
             <p style={{ fontSize: "14px", color: C.textMuted, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
-              Le fichier s'ouvrira dans votre navigateur. {formatUS ? "" : "Vérifiez vos coordonnées à gauche, puis"} cliquez sur <strong>Fichier → Imprimer → Enregistrer au format PDF</strong>.
+              La fenêtre d'impression va s'ouvrir. {formatUS ? "" : "Vérifiez vos coordonnées à gauche au préalable. "}Choisissez <strong>« Enregistrer au format PDF »</strong> comme destination, puis validez.
             </p>
 
             <div style={{ display: "flex", gap: "12px", marginTop: "24px", flexWrap: "wrap" }}>
@@ -3138,12 +3161,12 @@ export default function App() {
 
               <div style={{ marginTop: "16px" }}>
                 <PrimaryBtn onClick={() => downloadLettre(lettre)} icon="⬇️" variant="success">
-                  Télécharger ma lettre au format imprimable
+                  Télécharger ma lettre en PDF
                 </PrimaryBtn>
               </div>
 
               <p style={{ fontSize: "14px", color: C.textMuted, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
-                Cliquez sur <strong>Fichier → Imprimer → Enregistrer au format PDF</strong> pour obtenir le PDF final.
+                La fenêtre d'impression va s'ouvrir. Choisissez <strong>« Enregistrer au format PDF »</strong> comme destination, puis validez.
               </p>
 
               <div style={{

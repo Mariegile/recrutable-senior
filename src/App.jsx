@@ -390,9 +390,11 @@ Structure exacte :
     { "annees": "AAAA - AAAA", "intitule": "Diplome - Etablissement" }
   ],
   "competences": ["competence 1", "competence 2"],
-  "langues": ["Francais : langue maternelle", "Anglais : B1"]
+  "langues": ["Francais : langue maternelle", "Anglais : B1"],
+  "nouveauScore": <0-100>
 }
 Regles : si une information est absente du CV original, mets une chaine vide "" (ne l invente pas). Le champ contact reprend les vraies coordonnees du candidat si elles figurent dans le CV original.
+CHAMP "nouveauScore" : apres avoir reecrit le CV, evalue son score de compatibilite ATS (0-100) face a la fiche de poste fournie. Ce score doit refleter honnetement le CV REECRIT (integration des mots-cles, pertinence) et sera normalement nettement superieur au CV original. Reste realiste : n annonce pas 100 sauf adequation parfaite.
 REGLE DE LANGUE : tout le CV est redige EN FRANCAIS uniquement. Le champ "titre" doit etre un intitule de poste clair et naturel en francais, JAMAIS suivi de sa traduction anglaise ni d un terme anglais entre parentheses ou apres un tiret (ecrire "Analyste Risques et Conformite", PAS "Analyste Risques et Conformite - Compliance"). Les intitules de poste, diplomes et competences ne doivent pas melanger francais et anglais.`;
 
 const PROMPT_TRADUCTION = `Tu es un traducteur professionnel specialise dans les CV et le recrutement international.
@@ -493,6 +495,10 @@ function validerCV(raw) {
     : [];
 
   const c = obj.contact || {};
+  // Nouveau score ATS du CV réécrit (0-100), ou null si absent/invalide
+  let nouveauScore = null;
+  const sc = Math.round(Number(obj.nouveauScore));
+  if (!isNaN(sc)) nouveauScore = Math.min(100, Math.max(0, sc));
   return {
     nom:    str(obj.nom, 80)   || "Nom Prénom",
     titre:  str(obj.titre, 120) || "Poste visé",
@@ -507,6 +513,7 @@ function validerCV(raw) {
     formations,
     competences: strArr(obj.competences, 10, 120),
     langues:     strArr(obj.langues, 8, 80),
+    nouveauScore,
   };
 }
 
@@ -1402,6 +1409,66 @@ function ScoreBadge({ score }) {
       </div>
       <p style={{ fontSize: "17px", color: C.text, marginTop: "12px", marginBottom: 0, fontWeight: 500 }}>
         {message}
+      </p>
+    </div>
+  );
+}
+
+// Affiche la progression du score : score initial → score après optimisation
+function ScoreProgression({ scoreAvant, scoreApres }) {
+  const gain = scoreApres - scoreAvant;
+  const isGood = scoreApres >= 75;
+  const color  = isGood ? C.success : scoreApres >= 50 ? C.warning : C.error;
+  const bg     = isGood ? C.successSoft : scoreApres >= 50 ? C.warningSoft : C.errorSoft;
+  return (
+    <div style={{
+      background: bg,
+      border: `1px solid ${color}40`,
+      borderRadius: "14px",
+      padding: "24px 22px",
+      marginBottom: "24px",
+      textAlign: "center",
+      fontFamily: FONT_SANS,
+    }}>
+      <div style={{ fontSize: "14px", color: C.textSecondary, fontWeight: 500, marginBottom: "14px", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+        Score de compatibilité
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", flexWrap: "wrap" }}>
+        {/* Score avant */}
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 600, marginBottom: "2px" }}>
+            Avant
+          </div>
+          <div style={{ fontSize: "38px", fontWeight: 700, color: C.textMuted, fontFamily: FONT_SERIF, lineHeight: 1 }}>
+            {scoreAvant}<span style={{ fontSize: "20px", opacity: 0.7 }}>%</span>
+          </div>
+        </div>
+        {/* Flèche */}
+        <div style={{ fontSize: "30px", color, fontWeight: 700 }}>→</div>
+        {/* Score après */}
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "13px", color, fontWeight: 700, marginBottom: "2px" }}>
+            Après
+          </div>
+          <div style={{ fontSize: "56px", fontWeight: 700, color, fontFamily: FONT_SERIF, lineHeight: 1 }}>
+            {scoreApres}<span style={{ fontSize: "28px", opacity: 0.7 }}>%</span>
+          </div>
+        </div>
+      </div>
+      {gain > 0 && (
+        <div style={{
+          display: "inline-block", marginTop: "14px",
+          background: C.success, color: "#FFF",
+          fontSize: "15px", fontWeight: 700,
+          padding: "6px 16px", borderRadius: "20px",
+        }}>
+          🎉 +{gain} points gagnés
+        </div>
+      )}
+      <p style={{ fontSize: "15px", color: C.text, marginTop: "14px", marginBottom: 0, fontWeight: 500, lineHeight: 1.5 }}>
+        {gain > 0
+          ? "Votre CV optimisé passe bien mieux les filtres des recruteurs."
+          : "Votre CV était déjà bien positionné pour cette offre."}
       </p>
     </div>
   );
@@ -2531,6 +2598,7 @@ export default function App() {
   const [analyse, setAnalyse]               = useState(null);
   const [cvOpt, setCvOpt]                   = useState(null);
   const [cvOptError, setCvOptError]         = useState("");
+  const [scoreOptimise, setScoreOptimise]   = useState(null);
   const [cvEdite, setCvEdite]               = useState(null);
   const [couleurId, setCouleurId]           = useState("auto");
   const [sectionsMasquees, setSectionsMasquees] = useState([]);
@@ -2623,7 +2691,7 @@ export default function App() {
       return;
     }
     setLoading(true); setLoadingMsg("Réécriture de votre CV"); setStep(4);
-    setCvOpt(null); setCvOptError(""); setCvEdite(null);
+    setCvOpt(null); setCvOptError(""); setCvEdite(null); setScoreOptimise(null);
     setCouleurId("auto"); setSectionsMasquees([]); setModeTexte(false); setFormatUS(false);
     setCvEnAnglais(null); setLangueCV("francais"); setTraductionError("");
     const stopProgress = startProgress();
@@ -2656,6 +2724,12 @@ export default function App() {
       }
       setCvOpt(cv);
       setCvEdite(cv); // copie de travail pour l'édition contrôlée
+      // Nouveau score ATS du CV réécrit (si l'IA l'a fourni et qu'il progresse)
+      if (typeof cv.nouveauScore === "number") {
+        const ancien = analyse?.score ?? 0;
+        // On garde au minimum le score initial : l'optimisation ne fait jamais baisser
+        setScoreOptimise(Math.max(cv.nouveauScore, ancien));
+      }
       setCredits(depenseCredits(CREDITS.REWRITE));
     } catch (err) {
       setCvOptError(err.message || "Erreur inattendue durant la réécriture.");
@@ -2740,7 +2814,7 @@ export default function App() {
     setOffreText(""); setOffrePdf(null); setOffrePdfInfo(null);
     setAnalyse(null); setCvOpt(null); setCvOptError(""); setLettre(""); setLettreError("");
     setCvEdite(null); setCouleurId("auto"); setSectionsMasquees([]); setModeTexte(false); setFormatUS(false);
-    setCvEnAnglais(null); setLangueCV("francais"); setTraductionError("");
+    setCvEnAnglais(null); setLangueCV("francais"); setTraductionError(""); setScoreOptimise(null);
     setSecteur("default"); setLoadingProgress(0);
     setPivots(null); setPivotError(""); setShowPivot(false);
   };
@@ -3044,6 +3118,9 @@ export default function App() {
           {!loading && cvOptError && <ErrorBox message={cvOptError} onRetry={doCvOpt} onBack={() => setStep(3)}/>}
 
           {cvOpt && cvEdite && !cvOptError && !loading && <div>
+            {scoreOptimise !== null && analyse && (
+              <ScoreProgression scoreAvant={analyse.score} scoreApres={scoreOptimise}/>
+            )}
             <CVPreview
               cv={cvAffiche}
               secteur={secteur}
@@ -3181,7 +3258,7 @@ export default function App() {
                   🎉 Votre dossier de candidature est complet
                 </div>
                 <div style={{ fontSize: "16px", color: C.text, lineHeight: 2 }}>
-                  ✓ Score de compatibilité : <strong style={{ color: C.success }}>{analyse?.score}%</strong><br/>
+                  ✓ Score de compatibilité : <strong style={{ color: C.success }}>{scoreOptimise ?? analyse?.score}%</strong><br/>
                   ✓ CV optimisé sur 1 page avec {analyse?.motsManquants?.length ?? 0} mots-clés ajoutés<br/>
                   ✓ Lettre de motivation personnalisée
                 </div>

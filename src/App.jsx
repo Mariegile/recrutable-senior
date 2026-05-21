@@ -2609,6 +2609,8 @@ export default function App() {
   const [traduisant, setTraduisant]         = useState(false);
   const [traductionError, setTraductionError] = useState("");
   const [lettre, setLettre]                 = useState("");
+  const [lettreOriginale, setLettreOriginale] = useState("");
+  const [lettreModeEdition, setLettreModeEdition] = useState(false);
   const [lettreStreaming, setLettreStreaming] = useState(false);
   const [lettreError, setLettreError]       = useState("");
   const [secteur, setSecteur]               = useState("default");
@@ -2780,7 +2782,8 @@ export default function App() {
       return;
     }
     setLoading(true); setLoadingMsg("Rédaction de votre lettre de motivation"); setStep(5);
-    setLettre(""); setLettreError(""); setLettreStreaming(true);
+    setLettre(""); setLettreOriginale(""); setLettreError(""); setLettreStreaming(true);
+    setLettreModeEdition(false);
     const stopProgress = startProgress();
     try {
       let offreContent = "";
@@ -2800,6 +2803,7 @@ export default function App() {
         setLettre(result);
       }
       if (!result?.trim() || result.trim().length < 100) throw new Error("La réponse est trop courte. Réessayez s'il vous plaît.");
+      setLettreOriginale(result); // sauvegarde pour permettre de "Revenir à l'original"
       setCredits(depenseCredits(CREDITS.LETTRE));
     } catch (err) {
       setLettreError(err.message || "Erreur inattendue durant la rédaction.");
@@ -2813,6 +2817,7 @@ export default function App() {
     setStep(1); setCvText(""); setCvPdf(null); setCvPdfInfo(null);
     setOffreText(""); setOffrePdf(null); setOffrePdfInfo(null);
     setAnalyse(null); setCvOpt(null); setCvOptError(""); setLettre(""); setLettreError("");
+    setLettreOriginale(""); setLettreModeEdition(false);
     setCvEdite(null); setCouleurId("auto"); setSectionsMasquees([]); setModeTexte(false); setFormatUS(false);
     setCvEnAnglais(null); setLangueCV("francais"); setTraductionError(""); setScoreOptimise(null);
     setSecteur("default"); setLoadingProgress(0);
@@ -3229,10 +3234,66 @@ export default function App() {
             <PreviewBanner/>
             <div style={{ height: "16px" }}/>
 
-            <StreamingText text={lettre} isStreaming={lettreStreaming}/>
+            {/* Affichage : texte simple (lecture) OU zone éditable (édition) */}
+            {lettreModeEdition ? (
+              <textarea
+                value={lettre}
+                onChange={(e) => setLettre(e.target.value)}
+                style={{
+                  width: "100%",
+                  minHeight: "320px",
+                  padding: "20px 22px",
+                  borderRadius: "12px",
+                  border: `2px solid ${C.primary}`,
+                  background: C.bgSubtle,
+                  color: C.text,
+                  fontSize: "15px",
+                  lineHeight: 1.7,
+                  fontFamily: FONT_SANS,
+                  resize: "vertical",
+                  outline: "none",
+                }}
+              />
+            ) : (
+              <StreamingText text={lettre} isStreaming={lettreStreaming}/>
+            )}
 
             {!lettreStreaming && <>
-              <div style={{ display: "flex", gap: "12px", marginTop: "20px", flexWrap: "wrap" }}>
+              {/* Boutons d'édition : activer/désactiver + revenir à l'original */}
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "16px" }}>
+                <button
+                  onClick={() => setLettreModeEdition(m => !m)}
+                  style={{
+                    padding: "12px 20px",
+                    borderRadius: "10px",
+                    border: `2px solid ${lettreModeEdition ? C.primary : C.borderStrong}`,
+                    background: lettreModeEdition ? C.primarySoft : C.bgCard,
+                    color: lettreModeEdition ? C.primary : C.textSecondary,
+                    fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS,
+                    cursor: "pointer",
+                  }}
+                >
+                  {lettreModeEdition ? "✓ Modification activée" : "✏️ Corriger ma lettre"}
+                </button>
+                {lettreOriginale && lettre !== lettreOriginale && (
+                  <button
+                    onClick={() => setLettre(lettreOriginale)}
+                    style={{
+                      padding: "12px 20px",
+                      borderRadius: "10px",
+                      border: `2px solid ${C.borderStrong}`,
+                      background: C.bgCard,
+                      color: C.textMuted,
+                      fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ↩️ Revenir à la version d'origine
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: "flex", gap: "12px", marginTop: "16px", flexWrap: "wrap" }}>
                 <CopyBtn text={lettre}/>
               </div>
 

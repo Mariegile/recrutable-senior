@@ -1637,6 +1637,75 @@ function CVPreview({ cv, secteur, avecPhoto, couleurCustom, sectionsMasquees, fo
 }
 
 
+// ── Pacte de personnalisation : encart factuel pour inviter à corriger ─
+function PactePersonnalisation({ onPersonnaliser, dejaCorrige }) {
+  if (dejaCorrige) return null; // une fois que la personne a corrigé, on n'insiste plus
+  return (
+    <div style={{
+      background: C.warningSoft,
+      border: `1px solid ${C.warning}55`,
+      borderLeft: `5px solid ${C.warning}`,
+      borderRadius: "12px",
+      padding: "22px 24px",
+      marginBottom: "20px",
+      fontFamily: FONT_SANS,
+    }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
+        <span style={{ fontSize: "30px", lineHeight: 1, flexShrink: 0 }}>💡</span>
+        <div style={{ flex: 1 }}>
+          <h3 style={{
+            margin: 0, fontSize: "17px", fontWeight: 700,
+            color: "#7A5A14", fontFamily: FONT_SANS, lineHeight: 1.4,
+          }}>
+            Avant de télécharger, prenez 2 minutes pour personnaliser
+          </h3>
+          <p style={{
+            margin: "8px 0 12px", fontSize: "14.5px", color: C.text,
+            lineHeight: 1.6,
+          }}>
+            Les recruteurs reçoivent jusqu'à <strong>15 CV identiques générés par IA</strong> pour
+            une même offre. <strong>67 % d'entre eux</strong> écartent ces candidatures.
+            Votre touche personnelle est ce qui fait la différence aux yeux d'un humain.
+          </p>
+          <div style={{
+            background: C.bgCard,
+            border: `1px solid ${C.warning}33`,
+            borderRadius: "8px",
+            padding: "12px 14px",
+            marginBottom: "14px",
+            fontSize: "13.5px",
+            color: C.textSecondary,
+            lineHeight: 1.7,
+          }}>
+            <strong style={{ color: C.text }}>3 gestes simples qui changent tout :</strong>
+            <ul style={{ margin: "6px 0 0", paddingLeft: "18px" }}>
+              <li>Ajoutez <strong>un chiffre concret</strong> à au moins une expérience (ex : "+20% de chiffre d'affaires")</li>
+              <li>Reformulez les phrases trop génériques (<em>"Responsable de..."</em> → <em>"Augmenté de... grâce à..."</em>)</li>
+              <li>Ajoutez <strong>une réalisation dont vous êtes fier</strong> qui ne figure pas dans le CV original</li>
+            </ul>
+          </div>
+          <button
+            onClick={onPersonnaliser}
+            style={{
+              padding: "12px 22px",
+              borderRadius: "10px",
+              border: "none",
+              background: C.warning,
+              color: "#FFF",
+              fontSize: "15px", fontWeight: 700, fontFamily: FONT_SANS,
+              cursor: "pointer",
+              boxShadow: "0 2px 6px rgba(184,133,28,0.25)",
+            }}
+          >
+            ✏️ Personnaliser mon CV maintenant
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 // ── Édition contrôlée : barre d'outils (couleur + sections) ─────────
 function BarreEdition({ couleurId, onCouleur, sectionsMasquees, onToggleSection,
                         modeTexte, onToggleTexte, onReset, peutReset, masquerCouleurs }) {
@@ -1810,6 +1879,12 @@ function EditeurTexteCV({ cv, onChange }) {
     fontSize: "13px", fontWeight: 600, color: C.textSecondary,
     marginBottom: "4px", display: "block",
   };
+  // Style des conseils contextuels (petite phrase en italique sous le label)
+  const conseilStyle = {
+    fontSize: "12.5px", color: C.accent, fontStyle: "italic",
+    marginTop: "-4px", marginBottom: "8px", lineHeight: 1.5,
+    display: "block",
+  };
   const blocStyle = {
     background: C.bgSubtle, border: `1px solid ${C.border}`,
     borderRadius: "10px", padding: "14px 16px", marginBottom: "12px",
@@ -1826,10 +1901,11 @@ function EditeurTexteCV({ cv, onChange }) {
       fontFamily: FONT_SANS,
     }}>
       <div style={{ fontSize: "16px", fontWeight: 700, color: C.text, marginBottom: "6px" }}>
-        ✏️ Corriger le texte de mon CV
+        ✏️ Corriger et personnaliser le texte de mon CV
       </div>
       <p style={{ fontSize: "13px", color: C.textMuted, marginTop: 0, marginBottom: "16px", lineHeight: 1.5 }}>
-        Vos corrections apparaissent aussitôt dans l'aperçu. La mise en page reste protégée.
+        Vos corrections apparaissent aussitôt dans l'aperçu. Les conseils en orange
+        vous aident à <strong>vous démarquer</strong> des autres CV générés par IA.
       </p>
 
       {/* Identité */}
@@ -1851,6 +1927,9 @@ function EditeurTexteCV({ cv, onChange }) {
 
       {/* Profil */}
       <div style={titreSection}>Profil</div>
+      <span style={conseilStyle}>
+        💡 Mentionnez <strong>1 résultat chiffré</strong> (ex : "+20 % de clients", "12 personnes managées") — c'est ce qui retient l'œil des recruteurs.
+      </span>
       <textarea
         style={{ ...champStyle, minHeight: "90px", resize: "vertical", lineHeight: 1.5 }}
         value={cv.profil}
@@ -1858,7 +1937,12 @@ function EditeurTexteCV({ cv, onChange }) {
       />
 
       {/* Expériences */}
-      {cv.experiences.length > 0 && <div style={titreSection}>Expériences</div>}
+      {cv.experiences.length > 0 && <>
+        <div style={titreSection}>Expériences</div>
+        <span style={conseilStyle}>
+          💡 Préférez <strong>"Augmenté le CA de 15 %"</strong> à <strong>"Responsable des ventes"</strong>. Un verbe d'action + un chiffre = un impact visible.
+        </span>
+      </>}
       {cv.experiences.map((e, idx) => (
         <div key={idx} style={blocStyle}>
           <label style={labelStyle}>Poste</label>
@@ -3126,6 +3210,10 @@ export default function App() {
             {scoreOptimise !== null && analyse && (
               <ScoreProgression scoreAvant={analyse.score} scoreApres={scoreOptimise}/>
             )}
+            <PactePersonnalisation
+              onPersonnaliser={() => setModeTexte(true)}
+              dejaCorrige={editionModifiee}
+            />
             <CVPreview
               cv={cvAffiche}
               secteur={secteur}

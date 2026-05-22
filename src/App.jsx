@@ -705,25 +705,25 @@ function genererCvHtmlUS(cv, opts = {}) {
   const css = `@page{size:A4;margin:0}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:210mm;font-family:'Calibri','Carlito',Arial,sans-serif;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.us-page{width:210mm;min-height:297mm;padding:18mm 20mm;display:flex;flex-direction:column}
-.us-name{font-size:21pt;font-weight:700;color:#000;letter-spacing:0.2px}
-.us-contact{font-size:9.5pt;color:#333;margin-top:3px}
+.us-page{width:210mm;height:297mm;padding:14mm 18mm;display:flex;flex-direction:column;overflow:hidden}
+.us-name{font-size:20pt;font-weight:700;color:#000;letter-spacing:0.2px}
+.us-contact{font-size:9pt;color:#333;margin-top:3px}
 .us-contact .sep{color:#999}
-.us-headline{font-size:11pt;font-weight:700;color:#000;margin-top:7px}
-.us-subheading{font-size:9.5pt;color:#444;font-style:italic;margin-top:1px}
-.us-section{font-size:11.5pt;font-weight:700;color:#000;text-transform:none;border-bottom:1.5px solid #000;padding-bottom:2px;margin:15px 0 7px}
-.us-summary{font-size:10pt;line-height:1.5;color:#1a1a1a}
-.us-item{margin-bottom:9px}
+.us-headline{font-size:10.5pt;font-weight:700;color:#000;margin-top:6px}
+.us-subheading{font-size:9pt;color:#444;font-style:italic;margin-top:1px}
+.us-section{font-size:11pt;font-weight:700;color:#000;text-transform:none;border-bottom:1.5px solid #000;padding-bottom:2px;margin:11px 0 6px}
+.us-summary{font-size:9.7pt;line-height:1.45;color:#1a1a1a}
+.us-item{margin-bottom:7px}
 .us-exp-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-.us-role{font-size:10.5pt;font-weight:700;color:#000}
-.us-dates{font-size:9.5pt;color:#333;white-space:nowrap}
-.us-company{font-size:10pt;font-style:italic;color:#333;margin:1px 0 3px}
-.us-page ul{padding-left:16px;margin:3px 0}
-.us-page li{font-size:9.7pt;line-height:1.45;margin-bottom:2px}
-.us-skills{columns:2;column-gap:24px;padding-left:0;list-style:none}
-.us-skills li{break-inside:avoid;padding-left:14px;position:relative}
+.us-role{font-size:10pt;font-weight:700;color:#000}
+.us-dates{font-size:9pt;color:#333;white-space:nowrap}
+.us-company{font-size:9.5pt;font-style:italic;color:#333;margin:1px 0 2px}
+.us-page ul{padding-left:15px;margin:2px 0}
+.us-page li{font-size:9.3pt;line-height:1.4;margin-bottom:1px}
+.us-skills{columns:2;column-gap:22px;padding-left:0;list-style:none}
+.us-skills li{break-inside:avoid;padding-left:13px;position:relative}
 .us-skills li::before{content:"•";position:absolute;left:0;color:#000}
-.us-langues{font-size:9.7pt;color:#1a1a1a}
+.us-langues{font-size:9.3pt;color:#1a1a1a}
 .us-footer{font-size:6.5pt;color:#bbb;text-align:center;margin-top:14px;border-top:1px solid #eee;padding-top:6px}
 @media print{.us-footer{display:none}}`;
 
@@ -1700,6 +1700,34 @@ function PactePersonnalisation({ onPersonnaliser, dejaCorrige }) {
             ✏️ Personnaliser mon CV maintenant
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+// ── Conseil ATS : "1 CV par offre" — amorçage du retour utilisateur ────
+function ConseilATS({ variant = "etape4" }) {
+  // variant 'etape4' : avant le téléchargement — invitation
+  // variant 'etape5' : récap final — semence du retour
+  const message = variant === "etape4"
+    ? "Pour chaque nouvelle offre, refaites un dossier. Un CV adapté à l'offre passe 4 fois mieux les filtres ATS."
+    : "Pour votre prochaine candidature, revenez avec la nouvelle annonce. Un CV par offre, c'est 4 fois plus de chances de passer les filtres ATS.";
+  return (
+    <div style={{
+      background: C.primarySoft,
+      border: `1px solid ${C.primary}33`,
+      borderLeft: `4px solid ${C.primary}`,
+      borderRadius: "10px",
+      padding: "14px 18px",
+      marginBottom: variant === "etape4" ? "14px" : "0",
+      marginTop: variant === "etape5" ? "16px" : "0",
+      fontFamily: FONT_SANS,
+      display: "flex", alignItems: "flex-start", gap: "12px",
+    }}>
+      <span style={{ fontSize: "22px", flexShrink: 0, lineHeight: 1 }}>💡</span>
+      <div style={{ fontSize: "14.5px", color: C.text, lineHeight: 1.55 }}>
+        <strong style={{ color: C.primary }}>Astuce :</strong> {message}
       </div>
     </div>
   );
@@ -3279,7 +3307,8 @@ export default function App() {
               <CopyBtn text={cvVersTexte(cvAffiche)}/>
             </div>
 
-            <div style={{ marginTop: "16px" }}>
+            <div style={{ marginTop: "20px" }}>
+              <ConseilATS variant="etape4"/>
               <PrimaryBtn
                 onClick={() => downloadCV(cvAffiche, secteur, {
                   avecPhoto: !!cvPdfInfo?.aPhoto,
@@ -3411,6 +3440,7 @@ export default function App() {
                   ✓ CV optimisé sur 1 page avec {analyse?.motsManquants?.length ?? 0} mots-clés ajoutés<br/>
                   ✓ Lettre de motivation personnalisée
                 </div>
+                <ConseilATS variant="etape5"/>
               </div>
 
               <div style={{ display: "flex", gap: "12px", marginTop: "24px", flexWrap: "wrap" }}>

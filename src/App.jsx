@@ -662,42 +662,63 @@ function genererCvHtmlUS(cv, opts = {}) {
   const masquee = (id) => sectionsMasquees.includes(id);
   const en = langue === "anglais";
 
+  // ── Garde défensive : si le CV est invalide, on renvoie une page neutre ─
+  // Évite tout crash de rendu (cas de re-render React rapide ou données malformées).
+  if (!cv || typeof cv !== "object") {
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial;padding:40px;color:#666;text-align:center"><p>Préparation du CV en cours...</p></body></html>`;
+  }
+  // Normalisation défensive de tous les champs : ne plante jamais
+  const nom         = typeof cv.nom    === "string" ? cv.nom    : "";
+  const titre       = typeof cv.titre  === "string" ? cv.titre  : "";
+  const profil      = typeof cv.profil === "string" ? cv.profil : "";
+  const contactObj  = (cv.contact && typeof cv.contact === "object") ? cv.contact : {};
+  const experiences = Array.isArray(cv.experiences) ? cv.experiences : [];
+  const formations  = Array.isArray(cv.formations)  ? cv.formations  : [];
+  const competences = Array.isArray(cv.competences) ? cv.competences.filter(x => typeof x === "string") : [];
+  const langues     = Array.isArray(cv.langues)     ? cv.langues.filter(x => typeof x === "string")     : [];
+
   // Libellés selon la langue
   const L = en
     ? { profil: "Summary", comp: "Skills", exp: "Experience", form: "Education", lang: "Languages" }
     : { profil: "Profil", comp: "Compétences", exp: "Expérience", form: "Formation", lang: "Langues" };
 
   // Ligne de contact : email | LinkedIn | téléphone
-  const contactParts = [cv.contact.email, cv.contact.linkedin, cv.contact.telephone, cv.contact.ville]
-    .filter(Boolean).map(x => esc(x));
+  const contactParts = [contactObj.email, contactObj.linkedin, contactObj.telephone, contactObj.ville]
+    .filter(x => typeof x === "string" && x.trim()).map(x => esc(x));
   const contactLigne = contactParts.length
     ? contactParts.join('<span class="sep"> | </span>')
     : "votre@email.com";
 
-  // Expériences
-  const expHtml = cv.experiences.map(e => {
-    const taches = e.taches.length
-      ? `<ul>${e.taches.map(tx => `<li>${esc(tx)}</li>`).join("")}</ul>` : "";
-    const head = `<div class="us-exp-head"><span class="us-role">${esc(e.poste)}</span><span class="us-dates">${esc(e.dates)}</span></div>`;
-    const comp = e.entreprise ? `<div class="us-company">${esc(e.entreprise)}</div>` : "";
+  // Expériences (défensif : chaque champ peut manquer)
+  const expHtml = experiences.map(e => {
+    const tachesArr = Array.isArray(e?.taches) ? e.taches.filter(x => typeof x === "string") : [];
+    const taches = tachesArr.length
+      ? `<ul>${tachesArr.map(tx => `<li>${esc(tx)}</li>`).join("")}</ul>` : "";
+    const poste  = typeof e?.poste      === "string" ? e.poste      : "";
+    const dates  = typeof e?.dates      === "string" ? e.dates      : "";
+    const entr   = typeof e?.entreprise === "string" ? e.entreprise : "";
+    const head = `<div class="us-exp-head"><span class="us-role">${esc(poste)}</span><span class="us-dates">${esc(dates)}</span></div>`;
+    const comp = entr ? `<div class="us-company">${esc(entr)}</div>` : "";
     return `<div class="us-item">${head}${comp}${taches}</div>`;
   }).join("");
 
-  // Formation
-  const formHtml = cv.formations.map(f => {
-    const head = `<div class="us-exp-head"><span class="us-role">${esc(f.intitule)}</span><span class="us-dates">${esc(f.annees)}</span></div>`;
+  // Formation (défensif)
+  const formHtml = formations.map(f => {
+    const intitule = typeof f?.intitule === "string" ? f.intitule : "";
+    const annees   = typeof f?.annees   === "string" ? f.annees   : "";
+    const head = `<div class="us-exp-head"><span class="us-role">${esc(intitule)}</span><span class="us-dates">${esc(annees)}</span></div>`;
     return `<div class="us-item">${head}</div>`;
   }).join("");
 
   // Compétences — liste à puces sur 2 colonnes
-  const compHtml = cv.competences.length
-    ? `<ul class="us-skills">${cv.competences.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : "";
+  const compHtml = competences.length
+    ? `<ul class="us-skills">${competences.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : "";
 
   // Langues — ligne simple
-  const langHtml = cv.langues.length
-    ? `<p class="us-langues">${cv.langues.map(l => esc(l)).join("  ·  ")}</p>` : "";
+  const langHtml = langues.length
+    ? `<p class="us-langues">${langues.map(l => esc(l)).join("  ·  ")}</p>` : "";
 
-  const profilHtml = cv.profil ? `<p class="us-summary">${esc(cv.profil)}</p>` : "";
+  const profilHtml = profil ? `<p class="us-summary">${esc(profil)}</p>` : "";
 
   const footerBloc = pourImpression ? "" :
     `<div class="us-footer">💡 Fichier → Imprimer → Enregistrer en PDF</div>`;
@@ -736,9 +757,9 @@ html,body{width:210mm;font-family:'Calibri','Carlito',Arial,sans-serif;color:#00
     (langHtml && !masquee("langues")) ? `<div class="us-section">${L.lang}</div>${langHtml}` : "",
   ].join("");
 
-  return `<!DOCTYPE html><html lang="${en ? "en" : "fr"}"><head><meta charset="UTF-8"><title>CV ${esc(cv.nom)}</title>
+  return `<!DOCTYPE html><html lang="${en ? "en" : "fr"}"><head><meta charset="UTF-8"><title>CV ${esc(nom)}</title>
 <style>${css}</style></head>
-<body><div class="us-page"><div class="us-name">${esc(cv.nom)}</div><div class="us-contact">${contactLigne}</div><div class="us-headline">${esc(cv.titre)}</div><div class="us-main">${sections}</div>${footerBloc}</div></body></html>`;
+<body><div class="us-page"><div class="us-name">${esc(nom)}</div><div class="us-contact">${contactLigne}</div><div class="us-headline">${esc(titre)}</div><div class="us-main">${sections}</div>${footerBloc}</div></body></html>`;
 }
 
 // Ouvre le document dans une fenêtre d'impression : le navigateur propose
@@ -1591,17 +1612,44 @@ function CVPreview({ cv, secteur, avecPhoto, couleurCustom, sectionsMasquees, fo
     return () => window.removeEventListener("resize", calcScale);
   }, []);
 
-  const html = formatUS
-    ? genererCvHtmlUS(cv, {
-        pourImpression: true,
-        sectionsMasquees: sectionsMasquees || [],
-        langue: langue || "francais",
-      })
-    : genererCvHtml(cv, secteur, {
-        avecPhoto, pourImpression: true,
-        couleurCustom: couleurCustom || null,
-        sectionsMasquees: sectionsMasquees || [],
-      });
+  // Génération du HTML — protégée pour ne JAMAIS crasher l'app
+  // En cas d'erreur (CV malformé, données inattendues), on affiche un fallback
+  // au lieu de planter l'écran. La personne peut alors retourner en arrière.
+  let html = "";
+  let erreurRendu = null;
+  try {
+    html = formatUS
+      ? genererCvHtmlUS(cv, {
+          pourImpression: true,
+          sectionsMasquees: sectionsMasquees || [],
+          langue: langue || "francais",
+        })
+      : genererCvHtml(cv, secteur, {
+          avecPhoto, pourImpression: true,
+          couleurCustom: couleurCustom || null,
+          sectionsMasquees: sectionsMasquees || [],
+        });
+  } catch (err) {
+    erreurRendu = err?.message || "Une erreur est survenue lors du rendu du CV.";
+    console.error("CVPreview render error:", err);
+  }
+
+  if (erreurRendu) {
+    return (
+      <div style={{
+        background: C.errorSoft, border: `1px solid ${C.error}55`,
+        borderRadius: "12px", padding: "24px", textAlign: "center",
+        fontFamily: FONT_SANS, color: C.error,
+      }}>
+        <div style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>
+          Affichage temporairement indisponible
+        </div>
+        <div style={{ fontSize: "14px", color: C.textSecondary }}>
+          Essayez de revenir à l'étape précédente puis de réessayer.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={wrapRef} style={{ width: "100%", fontFamily: FONT_SANS }}>

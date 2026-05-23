@@ -2833,18 +2833,20 @@ export default function App() {
 
   useEffect(() => { loadPdfJs().catch(() => {}); }, []);
 
-  // ── DÉTECTEUR D'ERREUR TEMPORAIRE ── (à retirer après diagnostic) ──
-  // Affiche une boîte d'alerte avec le message d'erreur exact, pour qu'on
-  // puisse diagnostiquer le bug d'écran blanc. Sera retiré ensuite.
+  // ── Bloquer Google Translate (cause documentée de crash dans React) ──
+  // Le traducteur modifie le DOM en arrière-plan, ce qui peut faire planter
+  // React avec "removeChild: node is not a child of this node". On désactive
+  // proprement la traduction automatique au niveau du document entier.
   useEffect(() => {
-    const handler = (e) => {
-      const msg = e?.error?.message || e?.message || "erreur inconnue";
-      const ligne = e?.lineno || "?";
-      const fichier = (e?.filename || "").split("/").pop();
-      alert(`🔧 DIAGNOSTIC RECRUTABLE\n\nErreur : ${msg}\n\nLigne : ${ligne}\nFichier : ${fichier}\n\n(Faites une capture et envoyez à Claude)`);
-    };
-    window.addEventListener("error", handler);
-    return () => window.removeEventListener("error", handler);
+    const meta = document.createElement("meta");
+    meta.name = "google";
+    meta.content = "notranslate";
+    document.head.appendChild(meta);
+    if (document.documentElement) {
+      document.documentElement.setAttribute("translate", "no");
+      document.documentElement.lang = "fr";
+    }
+    return () => { try { document.head.removeChild(meta); } catch {} };
   }, []);
 
   // ── Au chargement : détecte le retour de paiement Stripe ──────────
@@ -3170,7 +3172,11 @@ export default function App() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, color: C.text, position: "relative", overflow: "hidden" }}>
+    <div
+      translate="no"
+      className="notranslate"
+      style={{ minHeight: "100vh", background: C.bg, color: C.text, position: "relative", overflow: "hidden" }}
+    >
       <style>{GLOBAL_STYLES}</style>
       <PaperBG/>
 

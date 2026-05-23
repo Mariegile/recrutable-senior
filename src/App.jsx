@@ -2785,6 +2785,20 @@ export default function App() {
 
   useEffect(() => { loadPdfJs().catch(() => {}); }, []);
 
+  // ── DÉTECTEUR D'ERREUR TEMPORAIRE ── (à retirer après diagnostic) ──
+  // Affiche une boîte d'alerte avec le message d'erreur exact, pour qu'on
+  // puisse diagnostiquer le bug d'écran blanc. Sera retiré ensuite.
+  useEffect(() => {
+    const handler = (e) => {
+      const msg = e?.error?.message || e?.message || "erreur inconnue";
+      const ligne = e?.lineno || "?";
+      const fichier = (e?.filename || "").split("/").pop();
+      alert(`🔧 DIAGNOSTIC RECRUTABLE\n\nErreur : ${msg}\n\nLigne : ${ligne}\nFichier : ${fichier}\n\n(Faites une capture et envoyez à Claude)`);
+    };
+    window.addEventListener("error", handler);
+    return () => window.removeEventListener("error", handler);
+  }, []);
+
   // ── Au chargement : détecte le retour de paiement Stripe ──────────
   useEffect(() => {
     const formule = detectRetourStripe();

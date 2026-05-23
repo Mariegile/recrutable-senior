@@ -192,6 +192,54 @@ function ajouterCredits(n) {
   } catch { return n; }
 }
 
+// ═════════════════════════════════════════════════════════════════
+//   SAUVEGARDE DE SESSION (localStorage) — Tout préserver
+// ═════════════════════════════════════════════════════════════════
+// Sauvegarde automatique de la session en cours pour reprendre exactement
+// au même point en cas de rechargement, fermeture d'onglet, etc.
+// Une seule session : la dernière. Limite raisonnable de 4 Mo.
+
+const SESSION_KEY = "recrutable_session_v1";
+const SESSION_MAX_BYTES = 4 * 1024 * 1024; // 4 Mo, large marge sous la limite localStorage (5 Mo)
+
+function sauvegarderSession(data) {
+  try {
+    // On ne sauvegarde PAS les fichiers PDF bruts (trop volumineux et peu utiles)
+    // mais on sauvegarde leur texte extrait via cvPdfInfo
+    const payload = {
+      version: 1,
+      date: new Date().toISOString(),
+      ...data,
+    };
+    const json = JSON.stringify(payload);
+    if (json.length > SESSION_MAX_BYTES) {
+      // Si trop volumineux, on ne sauvegarde pas plutôt que de risquer un crash
+      console.warn("Session trop volumineuse, non sauvegardée");
+      return false;
+    }
+    localStorage.setItem(SESSION_KEY, json);
+    return true;
+  } catch (err) {
+    // localStorage peut être plein ou désactivé : on échoue silencieusement
+    console.warn("Sauvegarde session échouée :", err?.message);
+    return false;
+  }
+}
+
+function chargerSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data || data.version !== 1) return null;
+    return data;
+  } catch { return null; }
+}
+
+function effacerSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch {}
+}
+
 // ── Détection retour Stripe + anti-doublon via session_id ──────────
 const USED_SESSIONS_KEY = "recrutable_used_sessions";
 const FORMULES_VALIDES = ["mensuel", "annuel", "recharge"];
@@ -2813,6 +2861,54 @@ export default function App() {
     }
   }, []);
 
+  // ── Au chargement : restaurer la session précédente si elle existe ──
+  // Reprise automatique là où la personne s'était arrêtée
+  useEffect(() => {
+    const session = chargerSession();
+    if (!session) return;
+    try {
+      // On restaure tous les états sauvegardés (avec valeurs par défaut sûres)
+      if (typeof session.step === "number")     setStep(session.step);
+      if (typeof session.cvText === "string")   setCvText(session.cvText);
+      if (session.cvPdfInfo)                    setCvPdfInfo(session.cvPdfInfo);
+      if (typeof session.offreText === "string") setOffreText(session.offreText);
+      if (session.offrePdfInfo)                 setOffrePdfInfo(session.offrePdfInfo);
+      if (session.analyse)                      setAnalyse(session.analyse);
+      if (session.cvOpt)                        setCvOpt(session.cvOpt);
+      if (session.cvEdite)                      setCvEdite(session.cvEdite);
+      if (session.cvEnAnglais)                  setCvEnAnglais(session.cvEnAnglais);
+      if (typeof session.langueCV === "string") setLangueCV(session.langueCV);
+      if (typeof session.formatUS === "boolean") setFormatUS(session.formatUS);
+      if (typeof session.couleurId === "string") setCouleurId(session.couleurId);
+      if (Array.isArray(session.sectionsMasquees)) setSectionsMasquees(session.sectionsMasquees);
+      if (typeof session.secteur === "string")  setSecteur(session.secteur);
+      if (typeof session.scoreOptimise === "number") setScoreOptimise(session.scoreOptimise);
+      if (typeof session.lettre === "string")   setLettre(session.lettre);
+      if (typeof session.lettreOriginale === "string") setLettreOriginale(session.lettreOriginale);
+    } catch (err) {
+      console.warn("Restauration de session échouée :", err?.message);
+      effacerSession();
+    }
+  }, []);
+
+  // ── À chaque changement d'état important : sauvegarder la session ──
+  // Tout est conservé pour reprendre exactement où on s'était arrêté
+  useEffect(() => {
+    // Ne sauvegarde rien si on est juste sur l'écran d'accueil vierge
+    const aQqChose = step > 1 || cvText || cvPdfInfo || offreText || offrePdfInfo ||
+                     analyse || cvOpt || lettre;
+    if (!aQqChose) return;
+    sauvegarderSession({
+      step, cvText, cvPdfInfo, offreText, offrePdfInfo,
+      analyse, cvOpt, cvEdite, cvEnAnglais,
+      langueCV, formatUS, couleurId, sectionsMasquees,
+      secteur, scoreOptimise, lettre, lettreOriginale,
+    });
+  }, [step, cvText, cvPdfInfo, offreText, offrePdfInfo,
+      analyse, cvOpt, cvEdite, cvEnAnglais,
+      langueCV, formatUS, couleurId, sectionsMasquees,
+      secteur, scoreOptimise, lettre, lettreOriginale]);
+
   const hasCV    = cvText.trim().length >= LIMITS.CV_MIN || (!!cvPdf && cvPdfInfo && !cvPdfInfo.estPhoto);
   const hasOffre = offreText.trim().length >= LIMITS.OFFRE_MIN || (!!offrePdf && offrePdfInfo && !offrePdfInfo.estPhoto);
   const canAnalyze = hasCV && hasOffre;
@@ -2996,6 +3092,7 @@ export default function App() {
     setCvEnAnglais(null); setLangueCV("francais"); setTraductionError(""); setScoreOptimise(null);
     setSecteur("default"); setLoadingProgress(0);
     setPivots(null); setPivotError(""); setShowPivot(false);
+    effacerSession(); // on efface aussi la session sauvegardée
   };
 
   // ── Édition contrôlée ──────────────────────────────────────────
@@ -3102,6 +3199,39 @@ export default function App() {
           <PageTitle subtitle="Ne vous inquiétez pas, votre CV n'a pas besoin d'être parfait. C'est justement pour ça qu'on est là.">
             Étape 1 : Votre CV actuel
           </PageTitle>
+
+          {/* Encart de reprise de session : visible si la personne a déjà saisi qqch */}
+          {(cvText || cvPdfInfo) && (
+            <div style={{
+              background: C.successSoft,
+              border: `1px solid ${C.success}55`,
+              borderLeft: `4px solid ${C.success}`,
+              borderRadius: "10px",
+              padding: "14px 18px",
+              marginBottom: "20px",
+              fontFamily: FONT_SANS,
+              display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap",
+            }}>
+              <span style={{ fontSize: "24px", flexShrink: 0 }}>💾</span>
+              <div style={{ flex: 1, minWidth: "180px", fontSize: "14px", color: C.text, lineHeight: 1.5 }}>
+                <strong style={{ color: C.success }}>Session reprise.</strong> Vos saisies précédentes ont été conservées.
+              </div>
+              <button
+                onClick={() => { if (window.confirm("Effacer toutes vos saisies et repartir de zéro ?")) reset(); }}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  border: `1px solid ${C.borderStrong}`,
+                  background: C.bgCard,
+                  color: C.textSecondary,
+                  fontSize: "13px", fontWeight: 600, fontFamily: FONT_SANS,
+                  cursor: "pointer",
+                }}
+              >
+                🔄 Nouvelle candidature
+              </button>
+            </div>
+          )}
 
           <DualInput
             label="Collez votre CV ou envoyez le PDF"

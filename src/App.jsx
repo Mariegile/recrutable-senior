@@ -866,7 +866,13 @@ const GLOBAL_STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
 
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: ${C.bg};  /* Fond beige garanti, même si Chrome force un thème sombre */
+    min-height: 100%;
+    color-scheme: light;  /* Empêche les navigateurs en mode sombre d'inverser les couleurs */
+  }
 
   body {
     font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -889,6 +895,128 @@ const GLOBAL_STYLES = `
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: ${C.borderStrong}; border-radius: 5px; }
   ::-webkit-scrollbar-thumb:hover { background: ${C.textMuted}; }
+
+  /* ═══════════════════════════════════════════════════════════════
+     RESPONSIVE — PC GRAND ÉCRAN (Livraison F2)
+     ═══════════════════════════════════════════════════════════════ */
+
+  /* PC moyen (1024px+) : conteneur plus large pour aérer */
+  @media (min-width: 1024px) {
+    .app-main-container {
+      max-width: 960px !important;
+      padding-left: 32px !important;
+      padding-right: 32px !important;
+    }
+    .app-header-inner {
+      max-width: 1100px !important;
+    }
+  }
+
+  /* PC grand écran (1440px+) : encore plus large */
+  @media (min-width: 1440px) {
+    .app-main-container {
+      max-width: 1080px !important;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     REFONTE MOBILE (Livraison F) — Active uniquement < 640px
+     PC, laptop et tablette : aucun changement
+     ═══════════════════════════════════════════════════════════════ */
+  @media (max-width: 640px) {
+
+    /* 1. RÉGIME MINCEUR — Barre des étapes compactée */
+    .step-bar-mobile-hide { display: none !important; }
+    .step-bar-mobile-show { display: block !important; }
+
+    /* 2. PAGE TITLE — Plus petit et plus serré sur mobile */
+    .page-title-h2 {
+      font-size: 22px !important;
+      line-height: 1.25 !important;
+    }
+    .page-title-subtitle {
+      font-size: 14px !important;
+      line-height: 1.5 !important;
+      margin-top: 6px !important;
+    }
+    /* Sous-titre rassurant qu'on cache à l'étape 1 (gain d'espace vital) */
+    .page-title-subtitle.mobile-hide { display: none !important; }
+
+    /* 3. EMPILEMENT — Les 2 modes (texte / PDF) deviennent rectangles longs */
+    .mode-selector-grid {
+      grid-template-columns: 1fr !important;
+      gap: 10px !important;
+    }
+    .mode-selector-card {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center !important;
+      text-align: left !important;
+      padding: 14px 16px !important;
+      gap: 14px !important;
+    }
+    .mode-selector-card-icon {
+      margin-bottom: 0 !important;
+      font-size: 24px !important;
+      flex-shrink: 0;
+    }
+    .mode-selector-card-text {
+      flex: 1;
+    }
+
+    /* 4. CARD — Padding réduit sur mobile pour gagner de l'espace */
+    .main-card {
+      padding: 20px 18px !important;
+      border-radius: 12px !important;
+    }
+
+    /* 5. HEADER plus compact sur mobile */
+    .app-header {
+      padding: 14px 16px !important;
+    }
+    .app-header h1 {
+      font-size: 22px !important;
+    }
+    .app-header-tagline {
+      font-size: 13px !important;
+      margin-top: 2px !important;
+    }
+
+    /* 6. CREDIT BADGE plus petit */
+    .credit-badge {
+      padding: 8px 12px !important;
+    }
+    .credit-badge-label {
+      font-size: 11px !important;
+    }
+    .credit-badge-value {
+      font-size: 18px !important;
+    }
+
+    /* 7. Conteneur principal : padding réduit */
+    .app-main-container {
+      padding: 16px 12px 100px !important;
+    }
+
+    /* 8. PRIMARY BUTTON — Reste bien visible et tactile */
+    .primary-btn {
+      min-height: 56px !important;
+      font-size: 17px !important;
+      padding: 14px 20px !important;
+    }
+
+    /* 9. Textarea : hauteur réduite */
+    .dual-input-textarea {
+      min-height: 180px !important;
+      font-size: 15px !important;
+      padding: 14px 16px !important;
+    }
+
+    /* 10. Drop zone PDF : padding réduit */
+    .pdf-drop-zone {
+      padding: 28px 16px !important;
+    }
+  }
 `;
 
 const FONT_SERIF = "'Fraunces', Georgia, 'Times New Roman', serif";
@@ -974,13 +1102,13 @@ function PaymentSuccessBanner({ formule, credits, onClose }) {
 
 function Header({ credits, onCreditsClick }) {
   return (
-    <div style={{
+    <div className="app-header" style={{
       background: C.bgCard,
       borderBottom: `1px solid ${C.border}`,
       padding: "20px 24px",
       position: "relative", zIndex: 1,
     }}>
-      <div style={{
+      <div className="app-header-inner" style={{
         maxWidth: "780px", margin: "0 auto",
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px",
       }}>
@@ -991,7 +1119,7 @@ function Header({ credits, onCreditsClick }) {
           }}>
             Recrutable
           </h1>
-          <p style={{
+          <p className="app-header-tagline" style={{
             margin: "4px 0 0", fontSize: "15px", color: C.textSecondary,
             fontFamily: FONT_SANS, fontWeight: 400,
           }}>
@@ -1050,57 +1178,87 @@ function StepBar({ current }) {
     { id: 4, label: "CV amélioré" },
     { id: 5, label: "Lettre" },
   ];
+  const pct = Math.round(((current - 1) / (steps.length - 1)) * 100);
   return (
     <div style={{
       background: C.bgCard, border: `1px solid ${C.border}`,
       borderRadius: "14px", padding: "20px 24px", marginBottom: "32px",
     }}>
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
-        {steps.map((s, i) => {
-          const done = current > s.id;
-          const active = current === s.id;
-          return (
-            <div key={s.id} style={{ display: "flex", alignItems: "flex-start", flex: i < steps.length - 1 ? 1 : "0 0 auto" }}>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", flexShrink: 0, width: "60px" }}>
-                <div style={{
-                  width: "40px", height: "40px", borderRadius: "50%",
-                  background: done ? C.success : active ? C.primary : C.bgSubtle,
-                  border: `2px solid ${done ? C.success : active ? C.primary : C.border}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "16px", fontWeight: 700, fontFamily: FONT_SANS,
-                  color: done || active ? "#FFF" : C.textMuted,
-                  transition: "all 0.3s ease",
-                }}>
-                  {done ? "✓" : s.id}
+      {/* ── Version PC / TABLETTE (cachée sur mobile via CSS) ── */}
+      <div className="step-bar-mobile-hide">
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
+          {steps.map((s, i) => {
+            const done = current > s.id;
+            const active = current === s.id;
+            return (
+              <div key={s.id} style={{ display: "flex", alignItems: "flex-start", flex: i < steps.length - 1 ? 1 : "0 0 auto" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", flexShrink: 0, width: "60px" }}>
+                  <div style={{
+                    width: "40px", height: "40px", borderRadius: "50%",
+                    background: done ? C.success : active ? C.primary : C.bgSubtle,
+                    border: `2px solid ${done ? C.success : active ? C.primary : C.border}`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "16px", fontWeight: 700, fontFamily: FONT_SANS,
+                    color: done || active ? "#FFF" : C.textMuted,
+                    transition: "all 0.3s ease",
+                  }}>
+                    {done ? "✓" : s.id}
+                  </div>
+                  <span style={{
+                    fontSize: "12px", fontFamily: FONT_SANS,
+                    fontWeight: active ? 700 : 500,
+                    color: active ? C.primary : done ? C.success : C.textMuted,
+                    textAlign: "center", lineHeight: 1.3, maxWidth: "70px",
+                  }}>
+                    {s.label}
+                  </span>
                 </div>
-                <span style={{
-                  fontSize: "12px", fontFamily: FONT_SANS,
-                  fontWeight: active ? 700 : 500,
-                  color: active ? C.primary : done ? C.success : C.textMuted,
-                  textAlign: "center", lineHeight: 1.3, maxWidth: "70px",
-                }}>
-                  {s.label}
-                </span>
+                {i < steps.length - 1 && (
+                  <div style={{
+                    flex: 1, height: "2px", marginTop: "19px",
+                    background: done ? C.success : C.border,
+                    transition: "background 0.3s ease",
+                  }}/>
+                )}
               </div>
-              {i < steps.length - 1 && (
-                <div style={{
-                  flex: 1, height: "2px", marginTop: "19px",
-                  background: done ? C.success : C.border,
-                  transition: "background 0.3s ease",
-                }}/>
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
+        <div style={{
+          marginTop: "16px", paddingTop: "14px", borderTop: `1px solid ${C.border}`,
+          fontSize: "14px", fontFamily: FONT_SANS, color: C.textSecondary,
+          textAlign: "center",
+        }}>
+          <strong style={{ color: C.primary, fontWeight: 600 }}>Étape {current} sur 5</strong>
+          {" · "}
+          Prenez votre temps, vous pouvez revenir en arrière à tout moment.
+        </div>
       </div>
-      <div style={{
-        marginTop: "16px", paddingTop: "14px", borderTop: `1px solid ${C.border}`,
-        fontSize: "14px", fontFamily: FONT_SANS, color: C.textSecondary,
-        textAlign: "center",
-      }}>
-        <strong style={{ color: C.primary, fontWeight: 600 }}>Étape {current} sur 5</strong>
-        {" · "}
-        Prenez votre temps, vous pouvez revenir en arrière à tout moment.
+
+      {/* ── Version MOBILE (cachée sur PC via CSS) ── */}
+      <div className="step-bar-mobile-show" style={{ display: "none" }}>
+        <div style={{
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          marginBottom: "10px", fontFamily: FONT_SANS,
+        }}>
+          <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            Étape {current} sur {steps.length}
+          </div>
+          <div style={{ fontSize: "14px", color: C.primary, fontWeight: 700 }}>
+            {steps[current - 1]?.label}
+          </div>
+        </div>
+        <div style={{
+          width: "100%", height: "6px",
+          background: C.border, borderRadius: "3px", overflow: "hidden",
+        }}>
+          <div style={{
+            height: "100%", background: C.primary,
+            width: `${pct}%`,
+            transition: "width 0.4s ease",
+            borderRadius: "3px",
+          }}/>
+        </div>
       </div>
     </div>
   );
@@ -1108,7 +1266,7 @@ function StepBar({ current }) {
 
 function Card({ children }) {
   return (
-    <div style={{
+    <div className="main-card" style={{
       background: C.bgCard,
       borderRadius: "16px",
       border: `1px solid ${C.border}`,
@@ -1121,17 +1279,17 @@ function Card({ children }) {
   );
 }
 
-function PageTitle({ children, subtitle }) {
+function PageTitle({ children, subtitle, hideSubtitleOnMobile = false }) {
   return (
     <div style={{ marginBottom: "28px" }}>
-      <h2 style={{
+      <h2 className="page-title-h2" style={{
         margin: 0, fontSize: "32px", fontFamily: FONT_SERIF, fontWeight: 600,
         color: C.text, letterSpacing: "-0.015em", lineHeight: 1.2,
       }}>
         {children}
       </h2>
       {subtitle && (
-        <p style={{
+        <p className={`page-title-subtitle${hideSubtitleOnMobile ? " mobile-hide" : ""}`} style={{
           margin: "10px 0 0", fontSize: "17px", fontFamily: FONT_SANS,
           color: C.textSecondary, lineHeight: 1.6, fontWeight: 400,
         }}>
@@ -1157,6 +1315,7 @@ function PrimaryBtn({ onClick, disabled, loading, children, icon, variant = "pri
       disabled={isOff}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      className="primary-btn"
       style={{
         width: "100%",
         minHeight: "64px",
@@ -1222,13 +1381,14 @@ function ModeSelector({ mode, onChange }) {
     { key: "pdf",  label: "Envoyer un fichier PDF",  icon: "📄", hint: "Si vous avez le PDF" },
   ];
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
+    <div className="mode-selector-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "20px" }}>
       {opts.map(o => {
         const sel = mode === o.key;
         return (
           <button
             key={o.key}
             onClick={() => onChange(o.key)}
+            className="mode-selector-card"
             style={{
               padding: "20px 16px",
               borderRadius: "12px",
@@ -1240,12 +1400,14 @@ function ModeSelector({ mode, onChange }) {
               fontFamily: FONT_SANS,
             }}
           >
-            <div style={{ fontSize: "28px", marginBottom: "8px" }}>{o.icon}</div>
-            <div style={{ fontSize: "16px", fontWeight: 600, color: sel ? C.primary : C.text, marginBottom: "4px" }}>
-              {o.label}
-            </div>
-            <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 500 }}>
-              {o.hint}
+            <div className="mode-selector-card-icon" style={{ fontSize: "28px", marginBottom: "8px" }}>{o.icon}</div>
+            <div className="mode-selector-card-text">
+              <div style={{ fontSize: "16px", fontWeight: 600, color: sel ? C.primary : C.text, marginBottom: "4px" }}>
+                {o.label}
+              </div>
+              <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 500 }}>
+                {o.hint}
+              </div>
             </div>
           </button>
         );
@@ -1312,6 +1474,7 @@ function DualInput({ label, hint, textValue, onTextChange, pdfFile, onPdfChange,
           onChange={e => onTextChange(e.target.value)}
           placeholder={placeholder}
           rows={12}
+          className="dual-input-textarea"
           style={{
             width: "100%",
             background: C.inputBg,
@@ -1344,6 +1507,7 @@ function DualInput({ label, hint, textValue, onTextChange, pdfFile, onPdfChange,
           onClick={() => !analyzingPdf && inputRef.current?.click()}
           onDragOver={e => e.preventDefault()}
           onDrop={e => { e.preventDefault(); if (!analyzingPdf) handlePdfSelected(e.dataTransfer.files[0]); }}
+          className="pdf-drop-zone"
           style={{
             border: `2px dashed ${pdfError ? C.error : pdfFile ? (pdfInfo?.estPhoto ? C.warning : C.success) : C.borderStrong}`,
             borderRadius: "12px",
@@ -3196,13 +3360,13 @@ export default function App() {
         credits={credits}
       />
 
-      <div style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>
+      <div className="app-main-container" style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>
 
         <StepBar current={step}/>
 
         {/* ÉTAPE 1 — Mon CV */}
         {step === 1 && <Card>
-          <PageTitle subtitle="Ne vous inquiétez pas, votre CV n'a pas besoin d'être parfait. C'est justement pour ça qu'on est là.">
+          <PageTitle subtitle="Ne vous inquiétez pas, votre CV n'a pas besoin d'être parfait. C'est justement pour ça qu'on est là." hideSubtitleOnMobile>
             Étape 1 : Votre CV actuel
           </PageTitle>
 

@@ -13,13 +13,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 // ═══════════════════════════════════════════════════════════════════
 
 // ── Liens Stripe Officiels ─────────────────────────────────────────
-// ⚠️ URLs Stripe à mettre à jour avec les nouvelles formules (Lala doit créer les nouveaux produits)
-const STRIPE_MENSUEL  = "https://buy.stripe.com/9B6eVe9Qc4lD9JQcL5eEo02"; // 5,99 € / mois - À METTRE À JOUR
-const STRIPE_ANNUEL   = "https://buy.stripe.com/4gM8wQ7I4aK12hobH1eEo01"; // 49,99 € / an - À METTRE À JOUR
-const STRIPE_RECHARGE = "https://buy.stripe.com/fZu00k2nKcS92ho9yTeEo00"; // 2,99 € recharge - À METTRE À JOUR
+const STRIPE_MENSUEL  = "https://buy.stripe.com/eVq6oI3rObO509g26reEo04"; // 5,99 € / mois
+const STRIPE_ANNUEL   = "https://buy.stripe.com/eVqdRa9Qcg4lf4a4ezeEo03"; // 49,99 € / an
+const STRIPE_RECHARGE = "https://buy.stripe.com/cNicN61jGf0hg8ecL5eEo05"; // 2,99 € recharge
 const SUPPORT_EMAIL   = "contact@recrutable.fr";
 
-// ── Coût en crédits par action ─────────────────────────────────────
 // ── Coût en crédits par action ─────────────────────────────────────
 // Logique : 1 crédit = 1 dossier complet (CV + Lettre + Pivot)
 // L'analyse est gratuite et algorithmique (sans IA)
@@ -200,17 +198,12 @@ function ajouterCredits(n) {
 // ═════════════════════════════════════════════════════════════════
 //   SAUVEGARDE DE SESSION (localStorage) — Tout préserver
 // ═════════════════════════════════════════════════════════════════
-// Sauvegarde automatique de la session en cours pour reprendre exactement
-// au même point en cas de rechargement, fermeture d'onglet, etc.
-// Une seule session : la dernière. Limite raisonnable de 4 Mo.
 
 const SESSION_KEY = "recrutable_session_v1";
-const SESSION_MAX_BYTES = 4 * 1024 * 1024; // 4 Mo, large marge sous la limite localStorage (5 Mo)
+const SESSION_MAX_BYTES = 4 * 1024 * 1024;
 
 function sauvegarderSession(data) {
   try {
-    // On ne sauvegarde PAS les fichiers PDF bruts (trop volumineux et peu utiles)
-    // mais on sauvegarde leur texte extrait via cvPdfInfo
     const payload = {
       version: 1,
       date: new Date().toISOString(),
@@ -218,14 +211,12 @@ function sauvegarderSession(data) {
     };
     const json = JSON.stringify(payload);
     if (json.length > SESSION_MAX_BYTES) {
-      // Si trop volumineux, on ne sauvegarde pas plutôt que de risquer un crash
       console.warn("Session trop volumineuse, non sauvegardée");
       return false;
     }
     localStorage.setItem(SESSION_KEY, json);
     return true;
   } catch (err) {
-    // localStorage peut être plein ou désactivé : on échoue silencieusement
     console.warn("Sauvegarde session échouée :", err?.message);
     return false;
   }
@@ -245,7 +236,6 @@ function effacerSession() {
   try { localStorage.removeItem(SESSION_KEY); } catch {}
 }
 
-// ── Détection retour Stripe + anti-doublon via session_id ──────────
 const USED_SESSIONS_KEY = "recrutable_used_sessions";
 const FORMULES_VALIDES = ["mensuel", "annuel", "recharge"];
 
@@ -255,26 +245,20 @@ function detectRetourStripe() {
     const paid = params.get("paid");
     const sessionId = params.get("session_id");
 
-    // Pas de paramètre paid => rien à faire
     if (!paid) return null;
 
-    // Toujours nettoyer l'URL pour ne pas re-créditer en cas de rechargement
     const cleanUrl = () => window.history.replaceState({}, "", window.location.pathname);
 
-    // Formule inconnue => on ignore et on nettoie
     if (!FORMULES_VALIDES.includes(paid)) { cleanUrl(); return null; }
 
-    // session_id invalide (pas une vraie session Stripe) => on ignore
     if (!sessionId || !sessionId.startsWith("cs_") || sessionId.length < 20) {
       cleanUrl();
       return null;
     }
 
-    // Vérifier que ce session_id n'a pas déjà été utilisé
     const used = JSON.parse(localStorage.getItem(USED_SESSIONS_KEY) || "[]");
     if (used.includes(sessionId)) { cleanUrl(); return null; }
 
-    // Marquer le session_id comme utilisé (garder les 100 derniers)
     used.push(sessionId);
     localStorage.setItem(USED_SESSIONS_KEY, JSON.stringify(used.slice(-100)));
 
@@ -316,7 +300,6 @@ async function analyserPdf(file) {
   let totalText = "";
   let aPhoto = false;
 
-  // Codes d'opérateurs pdf.js correspondant au dessin d'une image
   const OPS = pdfjs.OPS || {};
   const opsImage = [OPS.paintImageXObject, OPS.paintJpegXObject, OPS.paintImageMaskXObject]
     .filter(v => v !== undefined);
@@ -326,7 +309,6 @@ async function analyserPdf(file) {
     const content = await page.getTextContent();
     totalText += content.items.map(item => item.str).join(" ") + "\n";
 
-    // Détection d'image (probablement une photo de profil)
     if (!aPhoto && opsImage.length) {
       try {
         const opList = await page.getOperatorList();
@@ -447,7 +429,7 @@ Structure exacte :
   "nouveauScore": <0-100>
 }
 Regles : si une information est absente du CV original, mets une chaine vide "" (ne l invente pas). Le champ contact reprend les vraies coordonnees du candidat si elles figurent dans le CV original.
-CHAMP "nouveauScore" : apres avoir reecrit le CV, evalue son score de compatibilite ATS (0-100) face a la fiche de poste fournie. Ce score doit refleter honnetement le CV REECRIT (integration des mots-cles, pertinence) et sera normalement nettement superieur au CV original. Reste realiste : n annonce pas 100 sauf adequation parfaite.
+CHAMP "nouveauScore" : apres avoir reecrit le CV, evalue son score de compatibilite ATS (0-100) face a la fiche de poste fournie. Ce score doit refleter honnetement le CV REECRIT (integration des mots-cles, pertinence) et sera normalement nettement superior au CV original. Reste realiste : n annonce pas 100 sauf adequation parfaite.
 REGLE DE LANGUE : tout le CV est redige EN FRANCAIS uniquement. Le champ "titre" doit etre un intitule de poste clair et naturel en francais, JAMAIS suivi de sa traduction anglaise ni d un terme anglais entre parentheses ou apres un tiret (ecrire "Analyste Risques et Conformite", PAS "Analyste Risques et Conformite - Compliance"). Les intitules de poste, diplomes et competences ne doivent pas melanger francais et anglais.`;
 
 const PROMPT_TRADUCTION = `Tu es un traducteur professionnel specialise dans les CV et le recrutement international.
@@ -484,15 +466,9 @@ Reponds UNIQUEMENT en JSON valide sans markdown :
 {"pivots":[{"metier":"","score":85,"passerelle":"","gap":""},{"metier":"","score":75,"passerelle":"","gap":""},{"metier":"","score":65,"passerelle":"","gap":""}]}`;
 
 // ═══════════════════════════════════════════════════════════════════
-//   VALIDATION JSON
-// ═══════════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════
 //   ANALYSE ALGORITHMIQUE (sans IA, gratuite, illimitée)
-//   Coût pour Recrutable : 0€ (calcul local dans le navigateur)
 // ═══════════════════════════════════════════════════════════════════
 
-// ── Stop words français (mots à ignorer dans l'analyse) ───────────
 const STOP_WORDS_FR = new Set([
   "le","la","les","un","une","des","de","du","au","aux","à","et","ou","mais","donc","or","ni","car",
   "que","qui","quoi","dont","où","quel","quelle","quels","quelles","ce","cet","cette","ces",
@@ -507,14 +483,13 @@ const STOP_WORDS_FR = new Set([
   "an","ans","année","années","mois","jour","jours","semaine","semaines","heure","heures","fois",
   "1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20",
   "21","22","23","24","25","26","27","28","29","30","31","2018","2019","2020","2021","2022","2023","2024","2025","2026",
-  "cdi","cdd","cf","etc","ex","via","via","via","france","francais","française","francaise",
+  "cdi","cdd","cf","etc","ex","via","france","francais","française","francaise",
   "n","ne","pas","non","oui","sa","de","du","aux","des","un","une","les",
   "ce","cette","ces","cet","mon","ma","mes","ton","ta","tes","son","sa","ses",
   "très","peu","plus","moins","trop","assez","plutôt","tant","autant",
   "rue","avenue","boulevard","ville","code","postal","tel","tél","mail","email","@",
 ]);
 
-// ── Dictionnaires de mots-clés par secteur (pour détection) ───────
 const SECTEUR_KEYWORDS = {
   finance: ["finance","financier","financière","comptabilité","comptable","trésorerie","trésorier","budget","budgétaire",
     "audit","auditeur","fiscal","fiscalité","bilan","compte","comptes","résultat","p&l","ebitda","cash","cashflow",
@@ -533,7 +508,7 @@ const SECTEUR_KEYWORDS = {
     "négociation","négociations","contrat","contrats","chiffre","affaires","ca","portefeuille","secteur","b2b","b2c","crm",
     "salesforce","hubspot","prospection","relance","relances","devis","facture","factures","commande","commandes","livraison",
     "marge","rentabilité","objectifs","kpi","performance","performances","fidélisation","showroom","magasin","boutique"],
-  rh: ["recrutement","recrutements","recruteur","recruteuse","rh","humaines","humaines","talent","talents","candidat","candidats","candidate","candidates",
+  rh: ["recrutement","recrutements","recruteur","recruteuse","rh","humaines","talent","talents","candidat","candidats","candidate","candidates",
     "embauche","embauches","contrat","contrats","entretien","entretiens","onboarding","intégration","formation","formations",
     "paie","paies","payroll","sirh","sap","cegedim","ats","linkedin","sourcing","approche","directe","chasseur","chasse",
     "convention","collective","prudhomme","syndic","cdi","cdd","intérim","intérimaire","mobilité","carrière","carrières","gpec"],
@@ -548,11 +523,10 @@ const SECTEUR_KEYWORDS = {
     "ash","atsem","avs","aesh","éducation","nationale","académie","académique","didactique","apprentissage","formation","continue"],
   restauration: ["cuisine","cuisinier","cuisinière","chef","sous-chef","commis","pâtisserie","pâtissier","pâtissière","boulanger","boulangerie",
     "serveur","serveuse","sommelier","sommelière","barman","barmaid","maître","hôtel","brigade","service","clientèle",
-    "carte","menu","menus","plat","plats","produit","frais","frais","saison","local","bio","traiteur","banquet","événementiel",
-    "haccp","hygiène","sécurité","alimentaire","norme","norm","tva","caisse","encaissement","fidélité","réservation","réservations"],
+    "carte","menu","menus","plat","plats","produit","frais","saison","local","bio","traiteur","banquet","événementiel",
+    "haccp","hygiène","sécurité","alimentaire","norme","tva","caisse","encaissement","fidélité","réservation","réservations"],
 };
 
-// ── Verbes d'action (signe positif dans un CV) ────────────────────
 const VERBES_ACTION = new Set([
   "géré","gère","gérer","gestion","piloté","pilote","piloter","pilotage","dirigé","dirige","diriger","direction",
   "managé","manage","manager","management","encadré","encadre","encadrer","encadrement","supervisé","supervise","supervision",
@@ -565,17 +539,15 @@ const VERBES_ACTION = new Set([
   "réduit","réduire","réduction","résolu","résoudre","résolution","supervisé","atteint","atteindre","dépassé","dépasser",
 ]);
 
-// ── Normalisation : retirer accents, ponctuation, etc. ──────────────
 function normaliserMot(mot) {
   return mot
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")  // retire accents
-    .replace(/[^\w\s-]/g, "")          // garde lettres/chiffres/tirets
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\w\s-]/g, "")
     .trim();
 }
 
-// ── Découper un texte en mots significatifs ───────────────────────
 function tokeniser(texte) {
   if (!texte) return [];
   return texte
@@ -587,7 +559,6 @@ function tokeniser(texte) {
     .filter(t => t.length >= 3 && !STOP_WORDS_FR.has(t) && !STOP_WORDS_FR.has(t.normalize("NFD").replace(/[\u0300-\u036f]/g, "")));
 }
 
-// ── Détection du secteur dominant via les mots-clés ───────────────
 function detecterSecteur(texteOffre, texteCV) {
   const corpus = (texteOffre + " " + texteCV).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const scores = {};
@@ -595,13 +566,11 @@ function detecterSecteur(texteOffre, texteCV) {
     scores[secteur] = 0;
     for (const mc of motsCles) {
       const mcNorm = mc.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-      // compte les occurrences (mot entier)
       const regex = new RegExp(`\\b${mcNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "g");
       const matches = corpus.match(regex);
       if (matches) scores[secteur] += matches.length;
     }
   }
-  // secteur dominant
   let max = 0, winner = "default";
   for (const [s, sc] of Object.entries(scores)) {
     if (sc > max) { max = sc; winner = s; }
@@ -609,35 +578,30 @@ function detecterSecteur(texteOffre, texteCV) {
   return max >= 3 ? winner : "default";
 }
 
-// ── Extraire les mots-clés importants de l'offre ──────────────────
 function extraireMotsCles(texteOffre, secteur) {
   const tokens = tokeniser(texteOffre);
   const freq = {};
   for (const t of tokens) {
-    if (t.length < 4) continue;  // ignorer mots trop courts
+    if (t.length < 4) continue;
     freq[t] = (freq[t] || 0) + 1;
   }
-  // Bonus aux mots du dictionnaire du secteur détecté
   const motsCleSecteur = secteur !== "default" ? (SECTEUR_KEYWORDS[secteur] || []).map(m =>
     m.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
   ) : [];
   for (const mc of motsCleSecteur) {
-    if (freq[mc]) freq[mc] += 3;  // boost
+    if (freq[mc]) freq[mc] += 3;
   }
-  // Tri par fréquence + bonus
   const triés = Object.entries(freq)
     .sort((a, b) => b[1] - a[1])
     .map(([mot]) => mot)
     .filter(m => m.length >= 4 && !/^\d+$/.test(m));
-  return triés.slice(0, 15);  // top 15 mots-clés
+  return triés.slice(0, 15);
 }
 
-// ── Comparer CV vs offre : mots présents / manquants ──────────────
 function comparerMotsCles(motsCles, texteCV) {
   const cvNorm = texteCV.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const presents = [], manquants = [];
   for (const mc of motsCles) {
-    // recherche tolérante : mot entier ou racine
     const regex = new RegExp(`\\b${mc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\w*`, "i");
     if (regex.test(cvNorm)) {
       presents.push(mc);
@@ -648,10 +612,8 @@ function comparerMotsCles(motsCles, texteCV) {
   return { presents: presents.slice(0, 10), manquants: manquants.slice(0, 10) };
 }
 
-// ── Détecter les points forts/faibles structurels du CV ───────────
 function detecterPointsForts(texteCV) {
   const points = [];
-  // Verbes d'action
   let nbVerbesAction = 0;
   const cvNorm = texteCV.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   for (const v of VERBES_ACTION) {
@@ -659,29 +621,21 @@ function detecterPointsForts(texteCV) {
     if (cvNorm.includes(vNorm)) nbVerbesAction++;
   }
   if (nbVerbesAction >= 8) points.push("Nombreux verbes d'action qui valorisent vos réalisations");
-  // Chiffres
   const chiffres = texteCV.match(/\b\d+[%€$+]?\b/g);
   if (chiffres && chiffres.length >= 5) points.push("Résultats chiffrés présents — c'est très apprécié des recruteurs");
-  // Longueur du CV
   if (texteCV.length >= 800 && texteCV.length <= 4000) points.push("Longueur du CV équilibrée (ni trop court ni trop long)");
-  // Présence de dates
   const dates = texteCV.match(/\b(19|20)\d{2}\b/g);
   if (dates && dates.length >= 4) points.push("Parcours daté et structuré dans le temps");
-  // Email/téléphone
   if (/[\w.+-]+@[\w-]+\.[\w.-]+/.test(texteCV)) points.push("Coordonnées de contact clairement indiquées");
   return points.slice(0, 4);
 }
 
 function detecterPointsFaibles(texteCV) {
   const points = [];
-  // Trop court ?
   if (texteCV.length < 600) points.push("CV un peu court : ajoutez des détails sur vos missions et résultats");
-  // Trop long ?
   if (texteCV.length > 5000) points.push("CV peut-être trop long : visez 1 page A4 pour rester percutant");
-  // Pas de chiffres
   const chiffres = texteCV.match(/\b\d+[%€$+]?\b/g);
   if (!chiffres || chiffres.length < 3) points.push("Pas assez de résultats chiffrés (€, %, nombre d'équipes…)");
-  // Pas assez de verbes d'action
   let nbVerbesAction = 0;
   const cvNorm = texteCV.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   for (const v of VERBES_ACTION) {
@@ -689,12 +643,10 @@ function detecterPointsFaibles(texteCV) {
     if (cvNorm.includes(vNorm)) nbVerbesAction++;
   }
   if (nbVerbesAction < 5) points.push("Peu de verbes d'action : privilégiez 'piloté', 'augmenté', 'optimisé'…");
-  // Pas d'email
   if (!/[\w.+-]+@[\w-]+\.[\w.-]+/.test(texteCV)) points.push("Email de contact manquant ou difficile à repérer");
   return points.slice(0, 4);
 }
 
-// ── Conseils génériques par secteur (au lieu d'un conseil IA) ─────
 const CONSEIL_SECTEUR = {
   finance: "Dans la finance, intégrez les normes (IFRS, US GAAP), les outils (SAP, Excel avancé, Power BI) et chiffrez vos impacts (économies, marges, ROI). Les recruteurs scannent en priorité ces éléments.",
   sante: "Pour les métiers de santé, mentionnez vos diplômes, vos numéros d'agrément si pertinents, les protocoles maîtrisés et les types de patients accompagnés. La précision rassure les recruteurs.",
@@ -707,26 +659,18 @@ const CONSEIL_SECTEUR = {
   default: "Adaptez votre CV à chaque offre : reprenez les mots-clés exacts utilisés dans l'annonce, chiffrez vos réalisations et placez en premier les expériences les plus pertinentes pour le poste visé.",
 };
 
-// ── ANALYSE PRINCIPALE (orchestrateur) ─────────────────────────────
 function analyserAlgo(texteCV, texteOffre) {
   if (!texteCV || !texteOffre) {
     throw new Error("Veuillez fournir le CV et l'offre d'emploi.");
   }
-  // 1. Détection du secteur
   const secteur = detecterSecteur(texteOffre, texteCV);
-  // 2. Extraction des mots-clés de l'offre
   const motsCles = extraireMotsCles(texteOffre, secteur);
-  // 3. Comparaison CV vs mots-clés de l'offre
   const { presents, manquants } = comparerMotsCles(motsCles, texteCV);
-  // 4. Score = ratio de mots-clés présents
   const total = presents.length + manquants.length;
   const score = total > 0 ? Math.round((presents.length / total) * 100) : 50;
-  // 5. Points forts/faibles structurels
   const pointsForts = detecterPointsForts(texteCV);
   const pointsFaibles = detecterPointsFaibles(texteCV);
-  // 6. Conseil par secteur
   const conseil = CONSEIL_SECTEUR[secteur] || CONSEIL_SECTEUR.default;
-  // 7. Format/langue recommandés (basique : si l'offre contient des mots anglais, suggérer international)
   const offreEn = (texteOffre.match(/\b(english|fluent|required|experience|years|skills|management|level)\b/gi) || []).length;
   const formatRecommande = offreEn >= 3 ? "international" : "francais";
   const langueRecommandee = offreEn >= 5 ? "anglais" : "francais";
@@ -744,7 +688,7 @@ function analyserAlgo(texteCV, texteOffre) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
-//   VALIDATION JSON (utilisée pour l'IA, garde la rétro-compatibilité)
+//   VALIDATION JSON
 // ═══════════════════════════════════════════════════════════════════
 
 function validerAnalyse(raw) {
@@ -776,9 +720,7 @@ function validerPivot(raw) {
   }));
 }
 
-// Valide et nettoie le CV structuré renvoyé par Claude (format JSON)
 function validerCV(raw) {
-  // Extraire le bloc JSON même si Claude a ajouté du texte autour
   let txt = String(raw || "").replace(/```json|```/g, "").trim();
   const debut = txt.indexOf("{");
   const fin = txt.lastIndexOf("}");
@@ -808,7 +750,6 @@ function validerCV(raw) {
     : [];
 
   const c = obj.contact || {};
-  // Nouveau score ATS du CV réécrit (0-100), ou null si absent/invalide
   let nouveauScore = null;
   const sc = Math.round(Number(obj.nouveauScore));
   if (!isNaN(sc)) nouveauScore = Math.min(100, Math.max(0, sc));
@@ -834,13 +775,11 @@ function validerCV(raw) {
 //   GÉNÉRATION DU CV
 // ═══════════════════════════════════════════════════════════════════
 
-// Nom de fichier propre à partir du nom complet
 function prenomPourFichier(nom) {
   const premier = String(nom || "CV").trim().split(/\s+/)[0] || "CV";
   return premier.replace(/[^\wÀ-ÿ-]/g, "") || "CV";
 }
 
-// Reconstruit un texte lisible du CV (pour le bouton "Copier le texte")
 function cvVersTexte(cv) {
   const lignes = [];
   lignes.push(cv.nom);
@@ -871,25 +810,20 @@ function cvVersTexte(cv) {
   return lignes.join("\n");
 }
 
-// Génère le HTML complet du CV à partir du CV structuré (aperçu ET téléchargement)
 function genererCvHtml(cv, secteur, opts = {}) {
   const { avecPhoto = false, pourImpression = false, couleurCustom = null, sectionsMasquees = [] } = opts;
-  // Thème : couleur personnalisée choisie par l'utilisateur, sinon thème du secteur
   const base = THEMES[secteur] || THEMES.default;
   const t = couleurCustom
     ? { primary: couleurCustom.primary, accent: couleurCustom.accent, font: base.font }
     : base;
   const masquee = (id) => sectionsMasquees.includes(id);
 
-  // Bloc photo (cadre vide) — seulement si demandé
   const photoBloc = avecPhoto ? `
     <div class="photo-box"><div class="photo-inner">📷<br/>Ajoutez<br/>votre photo</div></div>` : "";
 
-  // Coordonnées de la sidebar — vraie valeur ou placeholder éditable
   const ligneContact = (icone, valeur, placeholder) =>
     `<p contenteditable="true" spellcheck="false">${icone} ${valeur ? esc(valeur) : placeholder}</p>`;
 
-  // Section EXPÉRIENCES — chaque type d'info a son style
   const expHtml = cv.experiences.map(e => {
     const taches = e.taches.length
       ? `<ul>${e.taches.map(tx => `<li>${esc(tx)}</li>`).join("")}</ul>` : "";
@@ -898,16 +832,13 @@ function genererCvHtml(cv, secteur, opts = {}) {
     return `<div class="exp-item"><div class="exp-head"><span class="exp-role">${esc(e.poste)}</span>${entreprise}</div>${dates}${taches}</div>`;
   }).join("");
 
-  // Section FORMATION
   const formHtml = cv.formations.map(f =>
     `<div class="form-item"><span class="form-years">${esc(f.annees)}</span><span class="form-label">${esc(f.intitule)}</span></div>`
   ).join("");
 
-  // Compétences (liste à puces)
   const compHtml = cv.competences.length
     ? `<ul>${cv.competences.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : "";
 
-  // Langues (ligne simple)
   const langHtml = cv.langues.length
     ? `<p class="langues">${cv.langues.map(l => esc(l)).join("  ·  ")}</p>` : "";
 
@@ -966,21 +897,14 @@ html,body{width:210mm;font-family:${t.font};color:#222;background:#fff;font-size
 <body><div class="page"><div class="top-bar"><div class="candidate-name">${esc(cv.nom)}</div><div class="candidate-title">${esc(cv.titre)}</div></div><div class="layout"><div class="sidebar">${photoBloc}${hintBloc}<div class="section-title">Contact</div>${ligneContact("📧", cv.contact.email, "votre@email.com")}${ligneContact("📞", cv.contact.telephone, "06 XX XX XX XX")}${ligneContact("📍", cv.contact.ville, "Votre ville")}${ligneContact("🔗", cv.contact.linkedin, "linkedin.com/in/profil")}</div><div class="main">${mainSections}</div></div>${footerBloc}</div></body></html>`;
 }
 
-// ── Template FORMAT AMÉRICAIN / INTERNATIONAL ──────────────────────
-// Mono-colonne, noir sur blanc, sans photo, optimisé ATS.
-// Ordre : Summary → Skills → Experience → Education.
-// Les libellés s'adaptent à la langue (français ou anglais).
 function genererCvHtmlUS(cv, opts = {}) {
   const { pourImpression = false, sectionsMasquees = [], langue = "francais" } = opts;
   const masquee = (id) => sectionsMasquees.includes(id);
   const en = langue === "anglais";
 
-  // ── Garde défensive : si le CV est invalide, on renvoie une page neutre ─
-  // Évite tout crash de rendu (cas de re-render React rapide ou données malformées).
   if (!cv || typeof cv !== "object") {
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body style="font-family:Arial;padding:40px;color:#666;text-align:center"><p>Préparation du CV en cours...</p></body></html>`;
   }
-  // Normalisation défensive de tous les champs : ne plante jamais
   const nom         = typeof cv.nom    === "string" ? cv.nom    : "";
   const titre       = typeof cv.titre  === "string" ? cv.titre  : "";
   const profil      = typeof cv.profil === "string" ? cv.profil : "";
@@ -990,19 +914,16 @@ function genererCvHtmlUS(cv, opts = {}) {
   const competences = Array.isArray(cv.competences) ? cv.competences.filter(x => typeof x === "string") : [];
   const langues     = Array.isArray(cv.langues)     ? cv.langues.filter(x => typeof x === "string")     : [];
 
-  // Libellés selon la langue
   const L = en
     ? { profil: "Summary", comp: "Skills", exp: "Experience", form: "Education", lang: "Languages" }
     : { profil: "Profil", comp: "Compétences", exp: "Expérience", form: "Formation", lang: "Langues" };
 
-  // Ligne de contact : email | LinkedIn | téléphone
   const contactParts = [contactObj.email, contactObj.linkedin, contactObj.telephone, contactObj.ville]
     .filter(x => typeof x === "string" && x.trim()).map(x => esc(x));
   const contactLigne = contactParts.length
     ? contactParts.join('<span class="sep"> | </span>')
     : "votre@email.com";
 
-  // Expériences (défensif : chaque champ peut manquer)
   const expHtml = experiences.map(e => {
     const tachesArr = Array.isArray(e?.taches) ? e.taches.filter(x => typeof x === "string") : [];
     const taches = tachesArr.length
@@ -1015,7 +936,6 @@ function genererCvHtmlUS(cv, opts = {}) {
     return `<div class="us-item">${head}${comp}${taches}</div>`;
   }).join("");
 
-  // Formation (défensif)
   const formHtml = formations.map(f => {
     const intitule = typeof f?.intitule === "string" ? f.intitule : "";
     const annees   = typeof f?.annees   === "string" ? f.annees   : "";
@@ -1023,11 +943,9 @@ function genererCvHtmlUS(cv, opts = {}) {
     return `<div class="us-item">${head}</div>`;
   }).join("");
 
-  // Compétences — liste à puces sur 2 colonnes
   const compHtml = competences.length
     ? `<ul class="us-skills">${competences.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : "";
 
-  // Langues — ligne simple
   const langHtml = langues.length
     ? `<p class="us-langues">${langues.map(l => esc(l)).join("  ·  ")}</p>` : "";
 
@@ -1061,7 +979,6 @@ html,body{width:210mm;font-family:'Calibri','Carlito',Arial,sans-serif;color:#00
 .us-footer{font-size:6.5pt;color:#bbb;text-align:center;margin-top:14px;border-top:1px solid #eee;padding-top:6px}
 @media print{.us-footer{display:none}}`;
 
-  // Sections, dans l'ordre américain : Summary → Skills → Experience → Education → Languages
   const sections = [
     (profilHtml && !masquee("profil")) ? `<div class="us-section">${L.profil}</div>${profilHtml}` : "",
     (compHtml && !masquee("competences")) ? `<div class="us-section">${L.comp}</div>${compHtml}` : "",
@@ -1075,12 +992,9 @@ html,body{width:210mm;font-family:'Calibri','Carlito',Arial,sans-serif;color:#00
 <body><div class="us-page"><div class="us-name">${esc(nom)}</div><div class="us-contact">${contactLigne}</div><div class="us-headline">${esc(titre)}</div><div class="us-main">${sections}</div>${footerBloc}</div></body></html>`;
 }
 
-// Ouvre le document dans une fenêtre d'impression : le navigateur propose
-// directement "Enregistrer en PDF". Le texte reste réel (lisible par les ATS).
 function imprimerDocument(html, titre) {
   const win = window.open("", "_blank");
   if (!win) {
-    // Bloqueur de pop-up : on retombe sur le téléchargement HTML classique
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1091,7 +1005,6 @@ function imprimerDocument(html, titre) {
   win.document.open();
   win.document.write(html);
   win.document.close();
-  // Laisse le temps au rendu (polices, mise en page) avant d'imprimer
   const lancer = () => {
     try { win.focus(); win.print(); } catch (e) {}
   };
@@ -1099,7 +1012,7 @@ function imprimerDocument(html, titre) {
     setTimeout(lancer, 600);
   } else {
     win.onload = () => setTimeout(lancer, 600);
-    setTimeout(lancer, 1500); // filet de sécurité si onload ne se déclenche pas
+    setTimeout(lancer, 1500);
   }
   return true;
 }
@@ -1107,7 +1020,6 @@ function imprimerDocument(html, titre) {
 function downloadCV(cv, secteur, opts = {}) {
   const { avecPhoto = false, couleurCustom = null, sectionsMasquees = [],
           formatUS = false, langue = "francais" } = opts;
-  // pourImpression: true → pas d'encart d'aide, document propre prêt pour le PDF
   const doc = formatUS
     ? genererCvHtmlUS(cv, { pourImpression: true, sectionsMasquees, langue })
     : genererCvHtml(cv, secteur, { avecPhoto, pourImpression: true, couleurCustom, sectionsMasquees });
@@ -1147,9 +1059,9 @@ const GLOBAL_STYLES = `
   html, body {
     margin: 0;
     padding: 0;
-    background: ${C.bg};  /* Fond beige garanti, même si Chrome force un thème sombre */
+    background: ${C.bg};
     min-height: 100%;
-    color-scheme: light;  /* Empêche les navigateurs en mode sombre d'inverser les couleurs */
+    color-scheme: light;
   }
 
   body {
@@ -1162,23 +1074,16 @@ const GLOBAL_STYLES = `
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
-  /* Focus rings accessibles */
   button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visible {
     outline: 3px solid ${C.primary};
     outline-offset: 2px;
   }
 
-  /* Scrollbar plus discrète */
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: ${C.borderStrong}; border-radius: 5px; }
   ::-webkit-scrollbar-thumb:hover { background: ${C.textMuted}; }
 
-  /* ═══════════════════════════════════════════════════════════════
-     RESPONSIVE — PC GRAND ÉCRAN (Livraison F2)
-     ═══════════════════════════════════════════════════════════════ */
-
-  /* PC moyen (1024px+) : conteneur plus large pour aérer */
   @media (min-width: 1024px) {
     .app-main-container {
       max-width: 960px !important;
@@ -1190,24 +1095,16 @@ const GLOBAL_STYLES = `
     }
   }
 
-  /* PC grand écran (1440px+) : encore plus large */
   @media (min-width: 1440px) {
     .app-main-container {
       max-width: 1080px !important;
     }
   }
 
-  /* ═══════════════════════════════════════════════════════════════
-     REFONTE MOBILE (Livraison F) — Active uniquement < 640px
-     PC, laptop et tablette : aucun changement
-     ═══════════════════════════════════════════════════════════════ */
   @media (max-width: 640px) {
-
-    /* 1. RÉGIME MINCEUR — Barre des étapes compactée */
     .step-bar-mobile-hide { display: none !important; }
     .step-bar-mobile-show { display: block !important; }
 
-    /* 2. PAGE TITLE — Plus petit et plus serré sur mobile */
     .page-title-h2 {
       font-size: 22px !important;
       line-height: 1.25 !important;
@@ -1217,10 +1114,8 @@ const GLOBAL_STYLES = `
       line-height: 1.5 !important;
       margin-top: 6px !important;
     }
-    /* Sous-titre rassurant qu'on cache à l'étape 1 (gain d'espace vital) */
     .page-title-subtitle.mobile-hide { display: none !important; }
 
-    /* 3. EMPILEMENT — Les 2 modes (texte / PDF) deviennent rectangles longs */
     .mode-selector-grid {
       grid-template-columns: 1fr !important;
       gap: 10px !important;
@@ -1242,13 +1137,11 @@ const GLOBAL_STYLES = `
       flex: 1;
     }
 
-    /* 4. CARD — Padding réduit sur mobile pour gagner de l'espace */
     .main-card {
       padding: 20px 18px !important;
       border-radius: 12px !important;
     }
 
-    /* 5. HEADER plus compact sur mobile */
     .app-header {
       padding: 14px 16px !important;
     }
@@ -1260,7 +1153,6 @@ const GLOBAL_STYLES = `
       margin-top: 2px !important;
     }
 
-    /* 6. CREDIT BADGE plus petit */
     .credit-badge {
       padding: 8px 12px !important;
     }
@@ -1271,26 +1163,22 @@ const GLOBAL_STYLES = `
       font-size: 18px !important;
     }
 
-    /* 7. Conteneur principal : padding réduit */
     .app-main-container {
       padding: 16px 12px 100px !important;
     }
 
-    /* 8. PRIMARY BUTTON — Reste bien visible et tactile */
     .primary-btn {
       min-height: 56px !important;
       font-size: 17px !important;
       padding: 14px 20px !important;
     }
 
-    /* 9. Textarea : hauteur réduite */
     .dual-input-textarea {
       min-height: 180px !important;
       font-size: 15px !important;
       padding: 14px 16px !important;
     }
 
-    /* 10. Drop zone PDF : padding réduit */
     .pdf-drop-zone {
       padding: 28px 16px !important;
     }
@@ -1305,7 +1193,6 @@ const FONT_SANS  = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sa
 // ═══════════════════════════════════════════════════════════════════
 
 function PaperBG() {
-  // Texture papier très subtile — pas d'animation, juste atmosphère
   return (
     <div style={{
       position: "fixed", inset: 0, pointerEvents: "none", zIndex: 0,
@@ -1317,7 +1204,6 @@ function PaperBG() {
   );
 }
 
-// ── Bannière de bienvenue après paiement Stripe réussi ─────────────
 function PaymentSuccessBanner({ formule, credits, onClose }) {
   const config = {
     mensuel:  { label: "Abonnement mensuel",  ajout: 10,  emoji: "🎉" },
@@ -1327,7 +1213,6 @@ function PaymentSuccessBanner({ formule, credits, onClose }) {
 
   if (!config) return null;
 
-  // Auto-fermeture après 10 secondes
   useEffect(() => {
     const t = setTimeout(onClose, 10000);
     return () => clearTimeout(t);
@@ -1462,7 +1347,6 @@ function StepBar({ current }) {
       background: C.bgCard, border: `1px solid ${C.border}`,
       borderRadius: "14px", padding: "20px 24px", marginBottom: "32px",
     }}>
-      {/* ── Version PC / TABLETTE (cachée sur mobile via CSS) ── */}
       <div className="step-bar-mobile-hide">
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
           {steps.map((s, i) => {
@@ -1513,7 +1397,6 @@ function StepBar({ current }) {
         </div>
       </div>
 
-      {/* ── Version MOBILE (cachée sur PC via CSS) ── */}
       <div className="step-bar-mobile-show" style={{ display: "none" }}>
         <div style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -1797,2441 +1680,4 @@ function DualInput({ label, hint, textValue, onTextChange, pdfFile, onPdfChange,
             fontFamily: FONT_SANS,
           }}
         >
-          <input ref={inputRef} type="file" accept=".pdf,application/pdf" onChange={e => handlePdfSelected(e.target.files[0])} style={{ display: "none" }}/>
-          {analyzingPdf ? <>
-            <div style={{
-              width: "48px", height: "48px", margin: "0 auto 16px",
-              border: `4px solid ${C.border}`, borderTopColor: C.primary,
-              borderRadius: "50%", animation: "spin 0.8s linear infinite",
-            }}/>
-            <div style={{ fontSize: "17px", fontWeight: 600, color: C.primary }}>
-              Lecture du PDF en cours...
-            </div>
-          </> : pdfFile && !pdfError ? <>
-            <div style={{ fontSize: "44px", marginBottom: "12px" }}>{pdfInfo?.estPhoto ? "⚠️" : "✅"}</div>
-            <div style={{ fontSize: "18px", fontWeight: 600, color: pdfInfo?.estPhoto ? C.warning : C.success, marginBottom: "8px" }}>
-              {pdfFile.name}
-            </div>
-            <div style={{ fontSize: "14px", color: C.textMuted, fontWeight: 500 }}>
-              {(pdfFile.size/1024).toFixed(0)} Ko · {pdfInfo?.pages || "?"} page(s) · Cliquez pour changer
-            </div>
-          </> : <>
-            <div style={{ fontSize: "48px", marginBottom: "16px" }}>📄</div>
-            <div style={{ fontSize: "18px", fontWeight: 600, color: C.text, marginBottom: "8px" }}>
-              Glissez votre fichier PDF ici
-            </div>
-            <div style={{ fontSize: "15px", color: C.textSecondary }}>
-              ou cliquez pour le sélectionner (10 Mo maximum)
-            </div>
-          </>}
-        </div>
-        {pdfFile && pdfInfo?.estPhoto && <InfoBox kind="warning">
-          <strong>Ce PDF est une image scannée.</strong> Le texte ne peut pas être lu.
-          Utilisez plutôt l'option « Copier-coller le texte » au-dessus.
-        </InfoBox>}
-        {pdfError && <InfoBox kind="error">{pdfError}</InfoBox>}
-      </>}
-    </div>
-  );
-}
-
-function InfoBox({ kind = "info", children }) {
-  const map = {
-    info:    { bg: C.primarySoft,  border: C.primary,  color: C.primary,  icon: "ℹ️" },
-    success: { bg: C.successSoft,  border: C.success,  color: C.success,  icon: "✅" },
-    warning: { bg: C.warningSoft,  border: C.warning,  color: "#7A5A14",  icon: "⚠️" },
-    error:   { bg: C.errorSoft,    border: C.error,    color: C.error,    icon: "⚠️" },
-  };
-  const s = map[kind];
-  return (
-    <div style={{
-      marginTop: "16px",
-      background: s.bg,
-      border: `1px solid ${s.border}55`,
-      borderLeft: `4px solid ${s.border}`,
-      borderRadius: "10px",
-      padding: "16px 18px",
-      display: "flex", alignItems: "flex-start", gap: "12px",
-      fontFamily: FONT_SANS,
-    }}>
-      <span style={{ fontSize: "20px", flexShrink: 0 }}>{s.icon}</span>
-      <div style={{ fontSize: "15px", color: s.color, lineHeight: 1.6, fontWeight: 500 }}>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Spinner({ text, progress }) {
-  return (
-    <div style={{ textAlign: "center", padding: "48px 0", fontFamily: FONT_SANS }}>
-      <div style={{
-        width: "56px", height: "56px", margin: "0 auto 20px",
-        border: `4px solid ${C.border}`, borderTopColor: C.primary,
-        borderRadius: "50%", animation: "spin 0.8s linear infinite",
-      }}/>
-      <p style={{ color: C.primary, fontSize: "18px", fontWeight: 600, margin: 0 }}>
-        {text}
-      </p>
-      <p style={{ color: C.textMuted, fontSize: "14px", marginTop: "8px", fontWeight: 500 }}>
-        Cela prend généralement entre 10 et 30 secondes.
-      </p>
-      {progress !== undefined && (
-        <div style={{
-          margin: "24px auto 0", maxWidth: "320px", height: "6px",
-          background: C.border, borderRadius: "3px", overflow: "hidden",
-        }}>
-          <div style={{
-            height: "100%", background: C.primary,
-            width: `${progress}%`, transition: "width 0.5s ease",
-            borderRadius: "3px",
-          }}/>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ScoreBadge({ score }) {
-  const isGood = score >= 75, isMid = score >= 50;
-  const color  = isGood ? C.success : isMid ? C.warning : C.error;
-  const bg     = isGood ? C.successSoft : isMid ? C.warningSoft : C.errorSoft;
-  const message = isGood ? "Excellent score. Votre dossier est solide."
-                : isMid  ? "Score correct. On peut faire mieux."
-                : "Score à améliorer. Notre réécriture va beaucoup vous aider.";
-  return (
-    <div style={{
-      background: bg,
-      border: `1px solid ${color}40`,
-      borderRadius: "14px",
-      padding: "28px",
-      marginBottom: "28px",
-      textAlign: "center",
-      fontFamily: FONT_SANS,
-    }}>
-      <div style={{ fontSize: "14px", color: C.textSecondary, fontWeight: 500, marginBottom: "8px", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-        Score de compatibilité
-      </div>
-      <div style={{
-        fontSize: "64px", fontWeight: 700, color, lineHeight: 1,
-        fontFamily: FONT_SERIF,
-      }}>
-        {score}<span style={{ fontSize: "32px", opacity: 0.6 }}>%</span>
-      </div>
-      <p style={{ fontSize: "17px", color: C.text, marginTop: "12px", marginBottom: 0, fontWeight: 500 }}>
-        {message}
-      </p>
-    </div>
-  );
-}
-
-// Affiche la progression du score : score initial → score après optimisation
-function ScoreProgression({ scoreAvant, scoreApres }) {
-  const gain = scoreApres - scoreAvant;
-  const isGood = scoreApres >= 75;
-  const color  = isGood ? C.success : scoreApres >= 50 ? C.warning : C.error;
-  const bg     = isGood ? C.successSoft : scoreApres >= 50 ? C.warningSoft : C.errorSoft;
-  return (
-    <div style={{
-      background: bg,
-      border: `1px solid ${color}40`,
-      borderRadius: "14px",
-      padding: "24px 22px",
-      marginBottom: "24px",
-      textAlign: "center",
-      fontFamily: FONT_SANS,
-    }}>
-      <div style={{ fontSize: "14px", color: C.textSecondary, fontWeight: 500, marginBottom: "14px", letterSpacing: "0.05em", textTransform: "uppercase" }}>
-        Score de compatibilité
-      </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", flexWrap: "wrap" }}>
-        {/* Score avant */}
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 600, marginBottom: "2px" }}>
-            Avant
-          </div>
-          <div style={{ fontSize: "38px", fontWeight: 700, color: C.textMuted, fontFamily: FONT_SERIF, lineHeight: 1 }}>
-            {scoreAvant}<span style={{ fontSize: "20px", opacity: 0.7 }}>%</span>
-          </div>
-        </div>
-        {/* Flèche */}
-        <div style={{ fontSize: "30px", color, fontWeight: 700 }}>→</div>
-        {/* Score après */}
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "13px", color, fontWeight: 700, marginBottom: "2px" }}>
-            Après
-          </div>
-          <div style={{ fontSize: "56px", fontWeight: 700, color, fontFamily: FONT_SERIF, lineHeight: 1 }}>
-            {scoreApres}<span style={{ fontSize: "28px", opacity: 0.7 }}>%</span>
-          </div>
-        </div>
-      </div>
-      {gain > 0 && (
-        <div style={{
-          display: "inline-block", marginTop: "14px",
-          background: C.success, color: "#FFF",
-          fontSize: "15px", fontWeight: 700,
-          padding: "6px 16px", borderRadius: "20px",
-        }}>
-          🎉 +{gain} points gagnés
-        </div>
-      )}
-      <p style={{ fontSize: "15px", color: C.text, marginTop: "14px", marginBottom: 0, fontWeight: 500, lineHeight: 1.5 }}>
-        {gain > 0
-          ? "Votre CV optimisé passe bien mieux les filtres des recruteurs."
-          : "Votre CV était déjà bien positionné pour cette offre."}
-      </p>
-    </div>
-  );
-}
-
-function Tags({ items, color, bg }) {
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-      {items.map((m, i) => (
-        <span key={i} style={{
-          background: bg, color,
-          border: `1px solid ${color}33`,
-          borderRadius: "8px",
-          padding: "8px 14px",
-          fontSize: "14px",
-          fontWeight: 600,
-          fontFamily: FONT_SANS,
-        }}>
-          {m}
-        </span>
-      ))}
-    </div>
-  );
-}
-
-function CopyBtn({ text }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      onClick={() => { navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
-      style={{
-        padding: "12px 20px",
-        borderRadius: "10px",
-        border: `2px solid ${copied ? C.success : C.borderStrong}`,
-        background: copied ? C.successSoft : C.bgCard,
-        color: copied ? C.success : C.textSecondary,
-        fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS,
-        cursor: "pointer", transition: "all 0.15s ease",
-        display: "inline-flex", alignItems: "center", gap: "8px",
-      }}
-    >
-      {copied ? "✓ Copié" : "📋 Copier le texte"}
-    </button>
-  );
-}
-
-// ── Bouton verrouillé : remplace les actions tant que paid === false ──
-function LockedBtn({ label, onUnlock, fullWidth = false, big = false }) {
-  const [hover, setHover] = useState(false);
-  return (
-    <button
-      onClick={onUnlock}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        width: fullWidth ? "100%" : "auto",
-        minHeight: big ? "64px" : "48px",
-        padding: big ? "18px 24px" : "12px 20px",
-        borderRadius: big ? "12px" : "10px",
-        border: "none",
-        background: hover ? C.accentDark : C.accent,
-        color: "#FFF",
-        fontSize: big ? "17px" : "15px",
-        fontWeight: 700,
-        fontFamily: FONT_SANS,
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "10px",
-        transition: "background 0.15s ease, transform 0.1s ease",
-        transform: hover ? "translateY(-1px)" : "translateY(0)",
-        boxShadow: big ? "0 4px 12px rgba(168,93,44,0.3)" : "0 2px 6px rgba(168,93,44,0.2)",
-      }}
-    >
-      <span style={{ fontSize: big ? "20px" : "16px" }}>🔒</span>
-      <span>{label}</span>
-    </button>
-  );
-}
-
-function ErrorBox({ message, onRetry, onBack }) {
-  return (
-    <div style={{
-      background: C.errorSoft,
-      border: `1px solid ${C.error}55`,
-      borderLeft: `4px solid ${C.error}`,
-      borderRadius: "12px",
-      padding: "24px",
-      marginBottom: "20px",
-      fontFamily: FONT_SANS,
-    }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", marginBottom: "18px" }}>
-        <span style={{ fontSize: "28px" }}>⚠️</span>
-        <div>
-          <div style={{ fontSize: "18px", fontWeight: 700, color: C.error, marginBottom: "6px" }}>
-            Une erreur est survenue
-          </div>
-          <div style={{ fontSize: "15px", color: C.textSecondary, lineHeight: 1.6, wordBreak: "break-word" }}>
-            {message}
-          </div>
-        </div>
-      </div>
-      <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-        {onBack && <SecondaryBtn onClick={onBack}>← Retour</SecondaryBtn>}
-        {onRetry && <div style={{ flex: 1, minWidth: "200px" }}><PrimaryBtn onClick={onRetry} icon="🔄" variant="primary">Réessayer</PrimaryBtn></div>}
-      </div>
-    </div>
-  );
-}
-
-function StreamingText({ text, isStreaming }) {
-  return (
-    <div style={{
-      background: C.bgSubtle,
-      border: `1px solid ${C.border}`,
-      borderRadius: "12px",
-      padding: "24px 28px",
-      fontSize: "16px",
-      lineHeight: 1.85,
-      whiteSpace: "pre-wrap",
-      color: C.text,
-      fontFamily: FONT_SANS,
-      maxHeight: "420px",
-      overflowY: "auto",
-    }}>
-      {text}
-      {isStreaming && (
-        <span style={{
-          display: "inline-block", width: "2px", height: "18px",
-          background: C.primary, marginLeft: "2px", verticalAlign: "text-bottom",
-          animation: "blink 0.7s step-end infinite",
-        }}/>
-      )}
-    </div>
-  );
-}
-
-// ── Aperçu fidèle du CV : le vrai document A4 mis en page ──────────
-function CVPreview({ cv, secteur, avecPhoto, couleurCustom, sectionsMasquees, formatUS, langue }) {
-  const wrapRef = useRef(null);
-  const [scale, setScale] = useState(0.5);
-
-  // A4 = 210mm de large ≈ 794px à 96 dpi
-  const A4_WIDTH_PX = 794;
-  const A4_HEIGHT_PX = 1123;
-
-  useEffect(() => {
-    const calcScale = () => {
-      const w = wrapRef.current?.offsetWidth || A4_WIDTH_PX;
-      setScale(Math.min(1, w / A4_WIDTH_PX));
-    };
-    calcScale();
-    window.addEventListener("resize", calcScale);
-    return () => window.removeEventListener("resize", calcScale);
-  }, []);
-
-  // Génération du HTML — protégée pour ne JAMAIS crasher l'app
-  // En cas d'erreur (CV malformé, données inattendues), on affiche un fallback
-  // au lieu de planter l'écran. La personne peut alors retourner en arrière.
-  let html = "";
-  let erreurRendu = null;
-  try {
-    html = formatUS
-      ? genererCvHtmlUS(cv, {
-          pourImpression: true,
-          sectionsMasquees: sectionsMasquees || [],
-          langue: langue || "francais",
-        })
-      : genererCvHtml(cv, secteur, {
-          avecPhoto, pourImpression: true,
-          couleurCustom: couleurCustom || null,
-          sectionsMasquees: sectionsMasquees || [],
-        });
-  } catch (err) {
-    erreurRendu = err?.message || "Une erreur est survenue lors du rendu du CV.";
-    console.error("CVPreview render error:", err);
-  }
-
-  if (erreurRendu) {
-    return (
-      <div style={{
-        background: C.errorSoft, border: `1px solid ${C.error}55`,
-        borderRadius: "12px", padding: "24px", textAlign: "center",
-        fontFamily: FONT_SANS, color: C.error,
-      }}>
-        <div style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>
-          Affichage temporairement indisponible
-        </div>
-        <div style={{ fontSize: "14px", color: C.textSecondary }}>
-          Essayez de revenir à l'étape précédente puis de réessayer.
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div ref={wrapRef} style={{ width: "100%", fontFamily: FONT_SANS }}>
-      <div style={{
-        height: A4_HEIGHT_PX * scale,
-        overflow: "hidden",
-        borderRadius: "10px",
-        border: `1px solid ${C.border}`,
-        boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
-        background: "#fff",
-      }}>
-        <iframe
-          title="Aperçu de votre CV"
-          srcDoc={html}
-          scrolling="no"
-          style={{
-            width: A4_WIDTH_PX,
-            height: A4_HEIGHT_PX,
-            border: "none",
-            transform: `scale(${scale})`,
-            transformOrigin: "top left",
-          }}
-        />
-      </div>
-      <p style={{
-        fontSize: "13px", color: C.textMuted, textAlign: "center",
-        marginTop: "10px", fontWeight: 500,
-      }}>
-        Aperçu réel de votre CV — c'est exactement ce que vous allez télécharger.
-      </p>
-    </div>
-  );
-}
-
-
-// ── Pacte de personnalisation : encart factuel pour inviter à corriger ─
-function PactePersonnalisation({ onPersonnaliser, dejaCorrige }) {
-  if (dejaCorrige) return null; // une fois que la personne a corrigé, on n'insiste plus
-  return (
-    <div style={{
-      background: C.warningSoft,
-      border: `1px solid ${C.warning}55`,
-      borderLeft: `5px solid ${C.warning}`,
-      borderRadius: "12px",
-      padding: "22px 24px",
-      marginBottom: "20px",
-      fontFamily: FONT_SANS,
-    }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-        <span style={{ fontSize: "30px", lineHeight: 1, flexShrink: 0 }}>💡</span>
-        <div style={{ flex: 1 }}>
-          <h3 style={{
-            margin: 0, fontSize: "17px", fontWeight: 700,
-            color: "#7A5A14", fontFamily: FONT_SANS, lineHeight: 1.4,
-          }}>
-            Avant de télécharger, prenez 2 minutes pour personnaliser
-          </h3>
-          <p style={{
-            margin: "8px 0 12px", fontSize: "14.5px", color: C.text,
-            lineHeight: 1.6,
-          }}>
-            Les recruteurs reçoivent jusqu'à <strong>15 CV identiques générés par IA</strong> pour
-            une même offre. <strong>67 % d'entre eux</strong> écartent ces candidatures.
-            Votre touche personnelle est ce qui fait la différence aux yeux d'un humain.
-          </p>
-          <div style={{
-            background: C.bgCard,
-            border: `1px solid ${C.warning}33`,
-            borderRadius: "8px",
-            padding: "12px 14px",
-            marginBottom: "14px",
-            fontSize: "13.5px",
-            color: C.textSecondary,
-            lineHeight: 1.7,
-          }}>
-            <strong style={{ color: C.text }}>3 gestes simples qui changent tout :</strong>
-            <ul style={{ margin: "6px 0 0", paddingLeft: "18px" }}>
-              <li>Ajoutez <strong>un chiffre concret</strong> à au moins une expérience (ex : "+20% de chiffre d'affaires")</li>
-              <li>Reformulez les phrases trop génériques (<em>"Responsable de..."</em> → <em>"Augmenté de... grâce à..."</em>)</li>
-              <li>Ajoutez <strong>une réalisation dont vous êtes fier</strong> qui ne figure pas dans le CV original</li>
-            </ul>
-          </div>
-          <button
-            onClick={onPersonnaliser}
-            style={{
-              padding: "12px 22px",
-              borderRadius: "10px",
-              border: "none",
-              background: C.warning,
-              color: "#FFF",
-              fontSize: "15px", fontWeight: 700, fontFamily: FONT_SANS,
-              cursor: "pointer",
-              boxShadow: "0 2px 6px rgba(184,133,28,0.25)",
-            }}
-          >
-            ✏️ Personnaliser mon CV maintenant
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-// ── Conseil ATS : "1 CV par offre" — amorçage du retour utilisateur ────
-function ConseilATS({ variant = "etape4" }) {
-  // variant 'etape4' : avant le téléchargement — invitation
-  // variant 'etape5' : récap final — semence du retour
-  const message = variant === "etape4"
-    ? "Pour chaque nouvelle offre, refaites un dossier. Un CV adapté à l'offre passe 4 fois mieux les filtres ATS."
-    : "Pour votre prochaine candidature, revenez avec la nouvelle annonce. Un CV par offre, c'est 4 fois plus de chances de passer les filtres ATS.";
-  return (
-    <div style={{
-      background: C.primarySoft,
-      border: `1px solid ${C.primary}33`,
-      borderLeft: `4px solid ${C.primary}`,
-      borderRadius: "10px",
-      padding: "14px 18px",
-      marginBottom: variant === "etape4" ? "14px" : "0",
-      marginTop: variant === "etape5" ? "16px" : "0",
-      fontFamily: FONT_SANS,
-      display: "flex", alignItems: "flex-start", gap: "12px",
-    }}>
-      <span style={{ fontSize: "22px", flexShrink: 0, lineHeight: 1 }}>💡</span>
-      <div style={{ fontSize: "14.5px", color: C.text, lineHeight: 1.55 }}>
-        <strong style={{ color: C.primary }}>Astuce :</strong> {message}
-      </div>
-    </div>
-  );
-}
-
-
-// ── Édition contrôlée : barre d'outils (couleur + sections) ─────────
-function BarreEdition({ couleurId, onCouleur, sectionsMasquees, onToggleSection,
-                        modeTexte, onToggleTexte, onReset, peutReset, masquerCouleurs }) {
-  return (
-    <div style={{
-      background: C.bgCard,
-      border: `1px solid ${C.border}`,
-      borderRadius: "14px",
-      padding: "20px 22px",
-      marginBottom: "20px",
-      fontFamily: FONT_SANS,
-    }}>
-      <div style={{ fontSize: "16px", fontWeight: 700, color: C.text, marginBottom: "16px" }}>
-        🎨 Personnaliser mon CV
-      </div>
-
-      {/* Couleurs — masquées en format international (CV noir et blanc) */}
-      {!masquerCouleurs && (
-      <div style={{ marginBottom: "18px" }}>
-        <div style={{ fontSize: "14px", fontWeight: 600, color: C.textSecondary, marginBottom: "10px" }}>
-          Couleur du CV
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-          {THEMES_CHOISISSABLES.map(th => {
-            const sel = couleurId === th.id;
-            const pastille = th.id === "auto" ? C.textMuted : th.primary;
-            return (
-              <button
-                key={th.id}
-                onClick={() => onCouleur(th.id)}
-                style={{
-                  display: "flex", alignItems: "center", gap: "8px",
-                  padding: "8px 14px",
-                  borderRadius: "10px",
-                  border: `2px solid ${sel ? C.primary : C.border}`,
-                  background: sel ? C.primarySoft : C.bgCard,
-                  cursor: "pointer",
-                  fontFamily: FONT_SANS,
-                  fontSize: "14px",
-                  fontWeight: sel ? 700 : 500,
-                  color: sel ? C.primary : C.textSecondary,
-                }}
-              >
-                <span style={{
-                  width: "18px", height: "18px", borderRadius: "50%",
-                  background: th.id === "auto"
-                    ? "linear-gradient(135deg,#1B3A5C,#A85D2C)"
-                    : pastille,
-                  border: `1px solid rgba(0,0,0,0.15)`, flexShrink: 0,
-                }}/>
-                {th.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      )}
-
-      {/* Sections à afficher */}
-      <div style={{ marginBottom: "18px" }}>
-        <div style={{ fontSize: "14px", fontWeight: 600, color: C.textSecondary, marginBottom: "10px" }}>
-          Sections affichées
-        </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-          {SECTIONS_CV.map(s => {
-            const visible = !sectionsMasquees.includes(s.id);
-            return (
-              <button
-                key={s.id}
-                onClick={() => onToggleSection(s.id)}
-                style={{
-                  display: "flex", alignItems: "center", gap: "8px",
-                  padding: "8px 14px",
-                  borderRadius: "10px",
-                  border: `2px solid ${visible ? C.success : C.border}`,
-                  background: visible ? C.successSoft : C.bgSubtle,
-                  cursor: "pointer",
-                  fontFamily: FONT_SANS,
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  color: visible ? C.success : C.textMuted,
-                }}
-              >
-                <span style={{ fontSize: "15px" }}>{visible ? "👁️" : "🚫"}</span>
-                {s.label}
-              </button>
-            );
-          })}
-        </div>
-        <p style={{ fontSize: "12px", color: C.textMuted, marginTop: "8px", marginBottom: 0 }}>
-          Cliquez sur une section pour l'afficher ou la masquer.
-        </p>
-      </div>
-
-      {/* Corriger le texte + Réinitialiser */}
-      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", paddingTop: "14px", borderTop: `1px solid ${C.border}` }}>
-        <button
-          onClick={onToggleTexte}
-          style={{
-            padding: "10px 18px",
-            borderRadius: "10px",
-            border: `2px solid ${modeTexte ? C.primary : C.borderStrong}`,
-            background: modeTexte ? C.primarySoft : C.bgCard,
-            color: modeTexte ? C.primary : C.textSecondary,
-            fontSize: "14px", fontWeight: 600, fontFamily: FONT_SANS,
-            cursor: "pointer",
-          }}
-        >
-          {modeTexte ? "✓ Modification du texte activée" : "✏️ Corriger le texte"}
-        </button>
-        {peutReset && (
-          <button
-            onClick={onReset}
-            style={{
-              padding: "10px 18px",
-              borderRadius: "10px",
-              border: `2px solid ${C.borderStrong}`,
-              background: C.bgCard,
-              color: C.textMuted,
-              fontSize: "14px", fontWeight: 600, fontFamily: FONT_SANS,
-              cursor: "pointer",
-            }}
-          >
-            ↩️ Revenir à la version d'origine
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Éditeur de texte du CV (champs clairs, mise à jour en direct) ───
-function EditeurTexteCV({ cv, onChange }) {
-  // Met à jour un champ simple
-  const setChamp = (cle, valeur) => onChange({ ...cv, [cle]: valeur });
-  const setContact = (cle, valeur) => onChange({ ...cv, contact: { ...cv.contact, [cle]: valeur } });
-
-  // Met à jour une expérience
-  const setExp = (idx, cle, valeur) => {
-    const experiences = cv.experiences.map((e, i) => i === idx ? { ...e, [cle]: valeur } : e);
-    onChange({ ...cv, experiences });
-  };
-  const setTache = (idxExp, idxTache, valeur) => {
-    const experiences = cv.experiences.map((e, i) => {
-      if (i !== idxExp) return e;
-      const taches = e.taches.map((t, j) => j === idxTache ? valeur : t);
-      return { ...e, taches };
-    });
-    onChange({ ...cv, experiences });
-  };
-
-  // Met à jour une formation
-  const setForm = (idx, cle, valeur) => {
-    const formations = cv.formations.map((f, i) => i === idx ? { ...f, [cle]: valeur } : f);
-    onChange({ ...cv, formations });
-  };
-
-  // Met à jour une compétence / langue
-  const setListe = (cle, idx, valeur) => {
-    const liste = cv[cle].map((x, i) => i === idx ? valeur : x);
-    onChange({ ...cv, [cle]: liste });
-  };
-
-  const champStyle = {
-    width: "100%", padding: "10px 12px", fontSize: "15px",
-    border: `1px solid ${C.inputBorder}`, borderRadius: "8px",
-    fontFamily: FONT_SANS, color: C.text, background: C.inputBg,
-    outline: "none", marginBottom: "8px",
-  };
-  const labelStyle = {
-    fontSize: "13px", fontWeight: 600, color: C.textSecondary,
-    marginBottom: "4px", display: "block",
-  };
-  // Style des conseils contextuels (petite phrase en italique sous le label)
-  const conseilStyle = {
-    fontSize: "12.5px", color: C.accent, fontStyle: "italic",
-    marginTop: "-4px", marginBottom: "8px", lineHeight: 1.5,
-    display: "block",
-  };
-  const blocStyle = {
-    background: C.bgSubtle, border: `1px solid ${C.border}`,
-    borderRadius: "10px", padding: "14px 16px", marginBottom: "12px",
-  };
-  const titreSection = {
-    fontSize: "15px", fontWeight: 700, color: C.primary,
-    margin: "20px 0 10px", fontFamily: FONT_SANS,
-  };
-
-  return (
-    <div style={{
-      background: C.bgCard, border: `1px solid ${C.border}`,
-      borderRadius: "14px", padding: "22px 22px", marginBottom: "20px",
-      fontFamily: FONT_SANS,
-    }}>
-      <div style={{ fontSize: "16px", fontWeight: 700, color: C.text, marginBottom: "6px" }}>
-        ✏️ Corriger et personnaliser le texte de mon CV
-      </div>
-      <p style={{ fontSize: "13px", color: C.textMuted, marginTop: 0, marginBottom: "16px", lineHeight: 1.5 }}>
-        Vos corrections apparaissent aussitôt dans l'aperçu. Les conseils en orange
-        vous aident à <strong>vous démarquer</strong> des autres CV générés par IA.
-      </p>
-
-      {/* Identité */}
-      <label style={labelStyle}>Nom complet</label>
-      <input style={champStyle} value={cv.nom} onChange={e => setChamp("nom", e.target.value)}/>
-      <label style={labelStyle}>Intitulé du poste</label>
-      <input style={champStyle} value={cv.titre} onChange={e => setChamp("titre", e.target.value)}/>
-
-      {/* Contact */}
-      <div style={titreSection}>Coordonnées</div>
-      <label style={labelStyle}>E-mail</label>
-      <input style={champStyle} value={cv.contact.email} onChange={e => setContact("email", e.target.value)}/>
-      <label style={labelStyle}>Téléphone</label>
-      <input style={champStyle} value={cv.contact.telephone} onChange={e => setContact("telephone", e.target.value)}/>
-      <label style={labelStyle}>Ville</label>
-      <input style={champStyle} value={cv.contact.ville} onChange={e => setContact("ville", e.target.value)}/>
-      <label style={labelStyle}>LinkedIn</label>
-      <input style={champStyle} value={cv.contact.linkedin} onChange={e => setContact("linkedin", e.target.value)}/>
-
-      {/* Profil */}
-      <div style={titreSection}>Profil</div>
-      <span style={conseilStyle}>
-        💡 Mentionnez <strong>1 résultat chiffré</strong> (ex : "+20 % de clients", "12 personnes managées") — c'est ce qui retient l'œil des recruteurs.
-      </span>
-      <textarea
-        style={{ ...champStyle, minHeight: "90px", resize: "vertical", lineHeight: 1.5 }}
-        value={cv.profil}
-        onChange={e => setChamp("profil", e.target.value)}
-      />
-
-      {/* Expériences */}
-      {cv.experiences.length > 0 && <>
-        <div style={titreSection}>Expériences</div>
-        <span style={conseilStyle}>
-          💡 Préférez <strong>"Augmenté le CA de 15 %"</strong> à <strong>"Responsable des ventes"</strong>. Un verbe d'action + un chiffre = un impact visible.
-        </span>
-      </>}
-      {cv.experiences.map((e, idx) => (
-        <div key={idx} style={blocStyle}>
-          <label style={labelStyle}>Poste</label>
-          <input style={champStyle} value={e.poste} onChange={ev => setExp(idx, "poste", ev.target.value)}/>
-          <label style={labelStyle}>Entreprise</label>
-          <input style={champStyle} value={e.entreprise} onChange={ev => setExp(idx, "entreprise", ev.target.value)}/>
-          <label style={labelStyle}>Dates</label>
-          <input style={champStyle} value={e.dates} onChange={ev => setExp(idx, "dates", ev.target.value)}/>
-          {e.taches.map((t, j) => (
-            <div key={j}>
-              <label style={labelStyle}>Tâche {j + 1}</label>
-              <textarea
-                style={{ ...champStyle, minHeight: "54px", resize: "vertical", lineHeight: 1.5 }}
-                value={t}
-                onChange={ev => setTache(idx, j, ev.target.value)}
-              />
-            </div>
-          ))}
-        </div>
-      ))}
-
-      {/* Formations */}
-      {cv.formations.length > 0 && <div style={titreSection}>Formation</div>}
-      {cv.formations.map((f, idx) => (
-        <div key={idx} style={blocStyle}>
-          <label style={labelStyle}>Années</label>
-          <input style={champStyle} value={f.annees} onChange={ev => setForm(idx, "annees", ev.target.value)}/>
-          <label style={labelStyle}>Diplôme — Établissement</label>
-          <input style={champStyle} value={f.intitule} onChange={ev => setForm(idx, "intitule", ev.target.value)}/>
-        </div>
-      ))}
-
-      {/* Compétences */}
-      {cv.competences.length > 0 && <div style={titreSection}>Compétences</div>}
-      {cv.competences.map((c, idx) => (
-        <input key={idx} style={champStyle} value={c} onChange={e => setListe("competences", idx, e.target.value)}/>
-      ))}
-
-      {/* Langues */}
-      {cv.langues.length > 0 && <div style={titreSection}>Langues</div>}
-      {cv.langues.map((l, idx) => (
-        <input key={idx} style={champStyle} value={l} onChange={e => setListe("langues", idx, e.target.value)}/>
-      ))}
-    </div>
-  );
-}
-
-
-// ── Sélecteur de format CV (français / international) ───────────────
-function SelecteurFormat({ formatUS, onChange, recommandeInternational }) {
-  const opts = [
-    {
-      key: false,
-      titre: "Format français",
-      desc: "Mise en page classique, idéale pour les entreprises françaises.",
-      icone: "🇫🇷",
-    },
-    {
-      key: true,
-      titre: "Format international",
-      desc: "Une colonne, sobre, optimisé pour les ATS américains et internationaux.",
-      icone: "🌍",
-    },
-  ];
-  return (
-    <div style={{
-      background: C.bgCard,
-      border: `1px solid ${C.border}`,
-      borderRadius: "14px",
-      padding: "20px 22px",
-      marginBottom: "20px",
-      fontFamily: FONT_SANS,
-    }}>
-      <div style={{ fontSize: "16px", fontWeight: 700, color: C.text, marginBottom: "4px" }}>
-        📄 Format du CV
-      </div>
-
-      {recommandeInternational && (
-        <div style={{
-          background: C.accentSoft,
-          border: `1px solid ${C.accent}55`,
-          borderLeft: `4px solid ${C.accent}`,
-          borderRadius: "10px",
-          padding: "12px 14px",
-          margin: "10px 0 14px",
-          fontSize: "14px", color: C.accentDark, lineHeight: 1.55,
-        }}>
-          <strong>Cette offre vise un poste à dimension internationale.</strong> Nous vous
-          recommandons le format international : il est attendu par les grandes entreprises
-          et lisible par leurs logiciels de tri de CV (ATS).
-        </div>
-      )}
-      {!recommandeInternational && (
-        <p style={{ fontSize: "13px", color: C.textMuted, margin: "4px 0 14px", lineHeight: 1.5 }}>
-          Choisissez la présentation adaptée au poste visé.
-        </p>
-      )}
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-        {opts.map(o => {
-          const sel = formatUS === o.key;
-          return (
-            <button
-              key={String(o.key)}
-              onClick={() => onChange(o.key)}
-              style={{
-                padding: "16px 14px",
-                borderRadius: "12px",
-                border: `2px solid ${sel ? C.primary : C.border}`,
-                background: sel ? C.primarySoft : C.bgCard,
-                cursor: "pointer",
-                textAlign: "left",
-                fontFamily: FONT_SANS,
-              }}
-            >
-              <div style={{ fontSize: "22px", marginBottom: "6px" }}>{o.icone}</div>
-              <div style={{ fontSize: "15px", fontWeight: 700, color: sel ? C.primary : C.text, marginBottom: "4px" }}>
-                {o.titre}
-              </div>
-              <div style={{ fontSize: "12.5px", color: C.textSecondary, lineHeight: 1.45 }}>
-                {o.desc}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-
-// ── Sélecteur de langue du CV (français / anglais) ──────────────────
-function SelecteurLangue({ langueCV, onChange, traduisant, traductionError,
-                           recommandeAnglais, dejaTraduit }) {
-  return (
-    <div style={{
-      background: C.bgCard,
-      border: `1px solid ${C.border}`,
-      borderRadius: "14px",
-      padding: "20px 22px",
-      marginBottom: "20px",
-      fontFamily: FONT_SANS,
-    }}>
-      <div style={{ fontSize: "16px", fontWeight: 700, color: C.text, marginBottom: "4px" }}>
-        🗣️ Langue du CV
-      </div>
-
-      {recommandeAnglais && langueCV === "francais" && (
-        <div style={{
-          background: C.accentSoft,
-          border: `1px solid ${C.accent}55`,
-          borderLeft: `4px solid ${C.accent}`,
-          borderRadius: "10px",
-          padding: "12px 14px",
-          margin: "10px 0 14px",
-          fontSize: "14px", color: C.accentDark, lineHeight: 1.55,
-        }}>
-          <strong>Cette offre est en anglais ou demande un CV en anglais.</strong> Nous vous
-          recommandons de traduire votre CV.
-        </div>
-      )}
-      {!(recommandeAnglais && langueCV === "francais") && (
-        <p style={{ fontSize: "13px", color: C.textMuted, margin: "4px 0 14px", lineHeight: 1.5 }}>
-          La traduction anglaise est incluse, sans crédit supplémentaire.
-        </p>
-      )}
-
-      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-        <button
-          onClick={() => onChange("francais")}
-          disabled={traduisant}
-          style={{
-            flex: 1, minWidth: "140px",
-            padding: "14px 16px",
-            borderRadius: "12px",
-            border: `2px solid ${langueCV === "francais" ? C.primary : C.border}`,
-            background: langueCV === "francais" ? C.primarySoft : C.bgCard,
-            color: langueCV === "francais" ? C.primary : C.textSecondary,
-            fontSize: "15px", fontWeight: 700, fontFamily: FONT_SANS,
-            cursor: traduisant ? "wait" : "pointer",
-          }}
-        >
-          🇫🇷 Français
-        </button>
-        <button
-          onClick={() => onChange("anglais")}
-          disabled={traduisant}
-          style={{
-            flex: 1, minWidth: "140px",
-            padding: "14px 16px",
-            borderRadius: "12px",
-            border: `2px solid ${langueCV === "anglais" ? C.primary : C.border}`,
-            background: langueCV === "anglais" ? C.primarySoft : C.bgCard,
-            color: langueCV === "anglais" ? C.primary : C.textSecondary,
-            fontSize: "15px", fontWeight: 700, fontFamily: FONT_SANS,
-            cursor: traduisant ? "wait" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
-          }}
-        >
-          {traduisant ? (
-            <>
-              <span style={{
-                width: "16px", height: "16px",
-                border: `2.5px solid ${C.border}`, borderTopColor: C.primary,
-                borderRadius: "50%", animation: "spin 0.7s linear infinite",
-              }}/>
-              Traduction...
-            </>
-          ) : (
-            <>🇬🇧 English{!dejaTraduit ? " — traduire" : ""}</>
-          )}
-        </button>
-      </div>
-
-      {traductionError && (
-        <div style={{
-          marginTop: "12px",
-          background: C.errorSoft,
-          border: `1px solid ${C.error}55`,
-          borderRadius: "10px",
-          padding: "12px 14px",
-          fontSize: "14px", color: C.error, lineHeight: 1.5,
-        }}>
-          {traductionError}
-        </div>
-      )}
-    </div>
-  );
-}
-
-
-function PreviewBanner() {
-  return (
-    <InfoBox kind="info">
-      <strong>Ceci est un aperçu rapide.</strong> Le document final que vous téléchargerez sera correctement mis en page,
-      avec votre secteur d'activité et prêt à imprimer.
-    </InfoBox>
-  );
-}
-
-// ── Paywall — clair, rassurant, prix bien visibles ──────────────────
-function BlurPaywall({ content }) {
-  const lines   = content.split("\n");
-  const preview = lines.slice(0, 4).join("\n");
-  const hidden  = lines.slice(4).join("\n");
-  const [selected, setSelected] = useState("annuel");
-
-  const FORMULES = {
-    annuel: {
-      label: "Abonnement annuel",
-      prix: "24,99 €", sous: "soit 2,08 € / mois",
-      items: ["120 crédits inclus pour l'année", "Économisez 30 % vs mensuel", "Accès complet 12 mois"],
-      href: STRIPE_ANNUEL,
-      cta: "Choisir l'annuel à 24,99 €",
-      badge: "★ Meilleure offre",
-      credits: RECHARGE_CREDITS.annuel,
-    },
-    mensuel: {
-      label: "Abonnement mensuel",
-      prix: "2,99 €", sous: "par mois, sans engagement",
-      items: ["10 crédits par mois", "Résiliable à tout moment", "Idéal pour tester"],
-      href: STRIPE_MENSUEL,
-      cta: "S'abonner à 2,99 € / mois",
-      credits: RECHARGE_CREDITS.mensuel,
-    },
-    recharge: {
-      label: "Recharge rapide",
-      prix: "1,99 €", sous: "paiement unique",
-      items: ["5 crédits supplémentaires", "Sans abonnement", "Utilisable immédiatement"],
-      href: STRIPE_RECHARGE,
-      cta: "Prendre 5 crédits — 1,99 €",
-      credits: RECHARGE_CREDITS.recharge,
-    },
-  };
-  const f = FORMULES[selected];
-
-  return (
-    <div style={{
-      borderRadius: "14px", overflow: "hidden",
-      border: `2px solid ${C.border}`,
-      fontFamily: FONT_SANS,
-    }}>
-      {/* Aperçu visible (4 premières lignes) */}
-      <div style={{
-        background: C.bgSubtle,
-        padding: "24px 28px",
-        fontSize: "16px",
-        lineHeight: 1.85,
-        whiteSpace: "pre-wrap",
-        color: C.text,
-        fontFamily: FONT_SANS,
-        borderBottom: `1px solid ${C.border}`,
-      }}>
-        {preview}
-      </div>
-
-      {/* Zone floue + offre */}
-      <div style={{ position: "relative" }}>
-        <div style={{
-          background: C.bgSubtle,
-          padding: "24px 28px",
-          fontSize: "16px", lineHeight: 1.85,
-          whiteSpace: "pre-wrap", color: C.text,
-          filter: "blur(6px)", userSelect: "none",
-          minHeight: "240px",
-        }}>
-          {hidden || "La suite de votre document apparaît ici, masquée jusqu'au paiement."}
-        </div>
-
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "rgba(255,255,255,0.97)",
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
-          padding: "28px 20px", overflowY: "auto",
-        }}>
-          <div style={{ fontSize: "44px", marginBottom: "10px" }}>🔓</div>
-          <h3 style={{
-            margin: 0, fontSize: "22px", fontWeight: 700,
-            fontFamily: FONT_SERIF, color: C.text, textAlign: "center",
-          }}>
-            Débloquez votre dossier complet
-          </h3>
-          <p style={{
-            margin: "8px 0 20px", fontSize: "15px", color: C.textSecondary,
-            textAlign: "center", maxWidth: "440px", lineHeight: 1.5,
-          }}>
-            CV complet, lettre de motivation et téléchargement au format prêt à imprimer.
-          </p>
-
-          {/* Cartes empilées verticalement — meilleure lisibilité mobile/senior */}
-          <div style={{
-            display: "flex", flexDirection: "column", gap: "10px",
-            width: "100%", maxWidth: "500px", marginBottom: "16px",
-          }}>
-            {Object.entries(FORMULES).map(([key, fm]) => {
-              const sel = selected === key;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setSelected(key)}
-                  style={{
-                    padding: "16px 18px",
-                    borderRadius: "12px",
-                    border: `2px solid ${sel ? C.primary : C.border}`,
-                    background: sel ? C.primarySoft : C.bgCard,
-                    cursor: "pointer", textAlign: "left", position: "relative",
-                    transition: "all 0.15s ease",
-                    fontFamily: FONT_SANS,
-                  }}
-                >
-                  {fm.badge && (
-                    <div style={{
-                      position: "absolute", top: "-10px", right: "16px",
-                      background: C.accent, color: "#FFF",
-                      fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "10px",
-                      letterSpacing: "0.04em",
-                    }}>
-                      {fm.badge}
-                    </div>
-                  )}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>
-                    <div style={{ fontSize: "14px", color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                      {fm.label}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                      <span style={{ fontSize: "22px", fontWeight: 700, color: sel ? C.primary : C.text, fontFamily: FONT_SERIF, lineHeight: 1 }}>
-                        {fm.prix}
-                      </span>
-                      <span style={{ fontSize: "12px", color: C.textSecondary, fontWeight: 500 }}>
-                        {fm.sous}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                    {fm.items.map((item, i) => (
-                      <div key={i} style={{ fontSize: "13px", color: C.textSecondary, display: "flex", gap: "6px", alignItems: "flex-start" }}>
-                        <span style={{ color: C.success, fontWeight: 700, flexShrink: 0 }}>✓</span>
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <a href={f.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", width: "100%", maxWidth: "500px" }}>
-            <div style={{
-              minHeight: "60px",
-              padding: "18px 24px",
-              borderRadius: "12px",
-              background: C.accent,
-              color: "#FFF",
-              fontSize: "17px",
-              fontWeight: 700,
-              textAlign: "center",
-              cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(168,93,44,0.3)",
-              transition: "transform 0.1s ease",
-              fontFamily: FONT_SANS,
-            }}>
-              {f.cta}
-            </div>
-          </a>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "14px", fontSize: "13px", color: C.textMuted, fontWeight: 500, textAlign: "center" }}>
-            <span style={{ fontSize: "16px" }}>🔒</span>
-            Paiement 100 % sécurisé par Stripe
-          </div>
-
-          {/* Info paiement automatique */}
-          <div style={{
-            marginTop: "14px",
-            background: C.successSoft,
-            border: `1px solid ${C.success}33`,
-            borderRadius: "10px",
-            padding: "10px 16px",
-            fontSize: "13px",
-            color: C.textSecondary,
-            textAlign: "center",
-            maxWidth: "500px",
-            lineHeight: 1.5,
-          }}>
-            ✓ Vos crédits seront <strong>ajoutés automatiquement</strong> dès le paiement validé.
-            <br/>
-            Un problème ? <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: C.primary, fontWeight: 600 }}>{SUPPORT_EMAIL}</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Suggestions de reconversion ─────────────────────────────────────
-function PivotCard({ pivots, onSelect }) {
-  return (
-    <div style={{ display: "grid", gap: "16px", marginTop: "20px" }}>
-      {pivots.map((p, i) => {
-        const scoreColor = p.score >= 75 ? C.success : p.score >= 55 ? C.accent : C.warning;
-        return (
-          <div key={i} style={{
-            background: C.bgCard,
-            border: `1px solid ${C.border}`,
-            borderRadius: "12px",
-            padding: "20px 22px",
-            fontFamily: FONT_SANS,
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px", gap: "12px", flexWrap: "wrap" }}>
-              <span style={{ fontWeight: 700, color: C.text, fontSize: "18px", fontFamily: FONT_SERIF }}>
-                {p.metier}
-              </span>
-              <span style={{
-                background: `${scoreColor}15`, color: scoreColor,
-                fontSize: "14px", fontWeight: 700,
-                padding: "6px 14px", borderRadius: "20px",
-              }}>
-                {p.score}% compatible
-              </span>
-            </div>
-            <p style={{ fontSize: "15px", color: C.text, marginBottom: "10px", lineHeight: 1.6, marginTop: 0 }}>
-              <strong style={{ color: C.success }}>Votre force : </strong>{p.passerelle}
-            </p>
-            <p style={{ fontSize: "14px", color: C.textSecondary, lineHeight: 1.6, marginBottom: "16px", marginTop: 0 }}>
-              <strong style={{ color: C.warning }}>À combler : </strong>{p.gap}
-            </p>
-            <button
-              onClick={() => onSelect(p.metier)}
-              style={{
-                width: "100%",
-                padding: "14px",
-                background: C.bgSubtle,
-                border: `2px solid ${C.borderStrong}`,
-                color: C.primary,
-                borderRadius: "10px",
-                cursor: "pointer",
-                fontSize: "15px",
-                fontWeight: 600,
-                fontFamily: FONT_SANS,
-                transition: "all 0.15s ease",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.background = C.primarySoft; e.currentTarget.style.borderColor = C.primary; }}
-              onMouseLeave={e => { e.currentTarget.style.background = C.bgSubtle; e.currentTarget.style.borderColor = C.borderStrong; }}
-            >
-              Optimiser mon CV pour ce métier →
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function Footer() {
-  return (
-    <div style={{
-      maxWidth: "780px", margin: "40px auto 0", padding: "0 16px",
-      fontFamily: FONT_SANS, fontSize: "14px", color: C.textMuted,
-      textAlign: "center", lineHeight: 1.7,
-    }}>
-      <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: "24px" }}>
-        <p style={{ margin: "0 0 8px" }}>
-          Besoin d'aide ? Écrivez-nous à <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: C.primary, fontWeight: 600 }}>{SUPPORT_EMAIL}</a>
-        </p>
-        <p style={{ margin: "0 0 8px", fontSize: "13px" }}>
-          Vos données restent confidentielles · Paiement sécurisé Stripe · Conforme RGPD
-        </p>
-        <p style={{ margin: 0, fontSize: "13px" }}>
-          © {new Date().getFullYear()} Recrutable · Le service qui aide les profils expérimentés à retrouver un emploi
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ── Modal des offres : ouverte depuis le badge des crédits ─────────
-function OffresModal({ open, onClose, credits }) {
-
-  // Empêche le scroll du body quand le modal est ouvert
-  useEffect(() => {
-    if (open) {
-      const original = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-      return () => { document.body.style.overflow = original; };
-    }
-  }, [open]);
-
-  if (!open) return null;
-
-  const OFFRES = [
-    {
-      key: "annuel",
-      label: "Abonnement annuel",
-      prix: "49,99 €", sous: "soit 4,16 € / mois",
-      items: ["60 dossiers complets dans l'année", "Économisez 30 % vs mensuel", "Accès complet 12 mois"],
-      href: STRIPE_ANNUEL,
-      cta: "Choisir l'annuel — 49,99 €",
-      badge: "★ Meilleure offre",
-      color: C.accent,
-    },
-    {
-      key: "mensuel",
-      label: "Abonnement mensuel",
-      prix: "5,99 €", sous: "par mois, sans engagement",
-      items: ["8 dossiers complets par mois", "Résiliable à tout moment", "Idéal pour candidater régulièrement"],
-      href: STRIPE_MENSUEL,
-      cta: "S'abonner — 5,99 € / mois",
-      color: C.primary,
-    },
-    {
-      key: "recharge",
-      label: "Recharge rapide",
-      prix: "2,99 €", sous: "paiement unique",
-      items: ["3 dossiers complets", "Sans abonnement", "Utilisable immédiatement"],
-      href: STRIPE_RECHARGE,
-      cta: "Prendre la recharge — 2,99 €",
-      color: C.success,
-    },
-  ];
-
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed", inset: 0, zIndex: 9999,
-        background: "rgba(15,37,64,0.65)",
-        display: "flex", alignItems: "flex-start", justifyContent: "center",
-        padding: "20px 12px",
-        overflowY: "auto",
-        animation: "fadeIn 0.2s ease",
-      }}
-    >
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          background: C.bgCard,
-          borderRadius: "16px",
-          maxWidth: "560px", width: "100%",
-          padding: "24px 22px",
-          fontFamily: FONT_SANS,
-          position: "relative",
-          marginTop: "20px",
-          marginBottom: "20px",
-          boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-        }}
-      >
-        {/* Bouton fermer */}
-        <button
-          onClick={onClose}
-          aria-label="Fermer"
-          style={{
-            position: "absolute", top: "12px", right: "12px",
-            width: "40px", height: "40px",
-            background: C.bgSubtle,
-            border: `1px solid ${C.border}`,
-            borderRadius: "50%",
-            fontSize: "20px", fontWeight: 700,
-            color: C.textSecondary,
-            cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}
-        >
-          ✕
-        </button>
-
-        {/* Crédits restants */}
-        <div style={{
-          background: C.primarySoft,
-          border: `1px solid ${C.primary}33`,
-          borderRadius: "12px",
-          padding: "14px 18px",
-          marginBottom: "20px",
-          marginTop: "8px",
-          marginRight: "44px",
-        }}>
-          <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 500 }}>
-            Il vous reste actuellement
-          </div>
-          <div style={{ fontSize: "26px", color: C.primary, fontFamily: FONT_SERIF, fontWeight: 700, lineHeight: 1.2 }}>
-            {credits} <span style={{ fontSize: "15px", fontWeight: 500, color: C.textSecondary }}>action{credits > 1 ? "s" : ""} IA</span>
-          </div>
-        </div>
-
-        <h2 style={{
-          margin: "0 0 6px", fontSize: "22px", fontFamily: FONT_SERIF, fontWeight: 700, color: C.text,
-        }}>
-          Recharger mon compte
-        </h2>
-        <p style={{
-          margin: "0 0 20px", fontSize: "15px", color: C.textSecondary, lineHeight: 1.5,
-        }}>
-          Choisissez la formule qui vous convient. Paiement sécurisé via Stripe.
-        </p>
-
-        {/* Cartes empilées */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
-          {OFFRES.map(o => (
-            <div key={o.key} style={{
-              border: `2px solid ${C.border}`,
-              borderRadius: "12px",
-              padding: "16px 18px",
-              position: "relative",
-              background: C.bgCard,
-            }}>
-              {o.badge && (
-                <div style={{
-                  position: "absolute", top: "-10px", right: "16px",
-                  background: o.color, color: "#FFF",
-                  fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "10px",
-                  letterSpacing: "0.04em",
-                }}>
-                  {o.badge}
-                </div>
-              )}
-
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", flexWrap: "wrap", marginBottom: "10px" }}>
-                <div style={{ fontSize: "14px", color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                  {o.label}
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                  <span style={{ fontSize: "22px", fontWeight: 700, color: o.color, fontFamily: FONT_SERIF, lineHeight: 1 }}>
-                    {o.prix}
-                  </span>
-                  <span style={{ fontSize: "12px", color: C.textSecondary, fontWeight: 500 }}>
-                    {o.sous}
-                  </span>
-                </div>
-              </div>
-
-              <div style={{ marginBottom: "14px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                {o.items.map((item, i) => (
-                  <div key={i} style={{ fontSize: "13px", color: C.textSecondary, display: "flex", gap: "6px", alignItems: "flex-start" }}>
-                    <span style={{ color: C.success, fontWeight: 700, flexShrink: 0 }}>✓</span>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-
-              <a href={o.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <div style={{
-                  minHeight: "52px",
-                  padding: "14px 18px",
-                  borderRadius: "10px",
-                  background: o.color,
-                  color: "#FFF",
-                  fontSize: "15px",
-                  fontWeight: 700,
-                  textAlign: "center",
-                  cursor: "pointer",
-                  fontFamily: FONT_SANS,
-                }}>
-                  {o.cta}
-                </div>
-              </a>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ textAlign: "center", fontSize: "13px", color: C.textMuted, marginBottom: "12px" }}>
-          🔒 Paiement 100 % sécurisé · Sans engagement · RGPD
-        </div>
-
-        {/* Info paiement automatique */}
-        <div style={{
-          background: C.successSoft,
-          border: `1px solid ${C.success}33`,
-          borderRadius: "10px",
-          padding: "12px 16px",
-          fontSize: "13px",
-          color: C.textSecondary,
-          textAlign: "center",
-          lineHeight: 1.5,
-        }}>
-          ✓ Vos crédits seront <strong>ajoutés automatiquement</strong> dès le paiement validé.
-          <br/>
-          Un problème ? Écrivez-nous : <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: C.primary, fontWeight: 600 }}>{SUPPORT_EMAIL}</a>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════
-//   APP PRINCIPALE
-// ═══════════════════════════════════════════════════════════════════
-
-export default function App() {
-  const [step, setStep]                     = useState(1);
-  const [cvText, setCvText]                 = useState("");
-  const [cvPdf, setCvPdf]                   = useState(null);
-  const [cvPdfInfo, setCvPdfInfo]           = useState(null);
-  const [offreText, setOffreText]           = useState("");
-  const [offrePdf, setOffrePdf]             = useState(null);
-  const [offrePdfInfo, setOffrePdfInfo]     = useState(null);
-  const [loading, setLoading]               = useState(false);
-  const [loadingMsg, setLoadingMsg]         = useState("");
-  const [loadingProgress, setLoadingProgress] = useState(0);
-  const [analyse, setAnalyse]               = useState(null);
-  const [cvOpt, setCvOpt]                   = useState(null);
-  const [cvOptError, setCvOptError]         = useState("");
-  const [scoreOptimise, setScoreOptimise]   = useState(null);
-  const [cvEdite, setCvEdite]               = useState(null);
-  const [couleurId, setCouleurId]           = useState("auto");
-  const [sectionsMasquees, setSectionsMasquees] = useState([]);
-  const [modeTexte, setModeTexte]           = useState(false);
-  const [formatUS, setFormatUS]             = useState(false);
-  const [cvEnAnglais, setCvEnAnglais]       = useState(null);
-  const [langueCV, setLangueCV]             = useState("francais");
-  const [traduisant, setTraduisant]         = useState(false);
-  const [traductionError, setTraductionError] = useState("");
-  const [lettre, setLettre]                 = useState("");
-  const [lettreOriginale, setLettreOriginale] = useState("");
-  const [lettreModeEdition, setLettreModeEdition] = useState(false);
-  const [lettreStreaming, setLettreStreaming] = useState(false);
-  const [lettreError, setLettreError]       = useState("");
-  const [secteur, setSecteur]               = useState("default");
-  const [paid, setPaid]                     = useState(false);
-  const [showOffres, setShowOffres]         = useState(false);
-  const [credits, setCredits]               = useState(getCredits);
-  const [pivots, setPivots]                 = useState(null);
-  const [pivotLoading, setPivotLoading]     = useState(false);
-  const [pivotError, setPivotError]         = useState("");
-  const [showPivot, setShowPivot]           = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(null);
-
-  useEffect(() => { loadPdfJs().catch(() => {}); }, []);
-
-  // ── Bloquer Google Translate (cause documentée de crash dans React) ──
-  // Le traducteur modifie le DOM en arrière-plan, ce qui peut faire planter
-  // React avec "removeChild: node is not a child of this node". On désactive
-  // proprement la traduction automatique au niveau du document entier.
-  useEffect(() => {
-    const meta = document.createElement("meta");
-    meta.name = "google";
-    meta.content = "notranslate";
-    document.head.appendChild(meta);
-    if (document.documentElement) {
-      document.documentElement.setAttribute("translate", "no");
-      document.documentElement.lang = "fr";
-    }
-    return () => { try { document.head.removeChild(meta); } catch {} };
-  }, []);
-
-  // ── Au chargement : détecte le retour de paiement Stripe ──────────
-  useEffect(() => {
-    const formule = detectRetourStripe();
-    if (formule) {
-      const n = RECHARGE_CREDITS[formule] ?? 0;
-      if (n > 0) {
-        const nouveauTotal = ajouterCredits(n);
-        setCredits(nouveauTotal);
-        setPaid(true);
-        setPaymentSuccess(formule);
-      }
-    }
-  }, []);
-
-  // ── Au chargement : restaurer la session précédente si elle existe ──
-  // Reprise automatique là où la personne s'était arrêtée
-  useEffect(() => {
-    const session = chargerSession();
-    if (!session) return;
-    try {
-      // On restaure tous les états sauvegardés (avec valeurs par défaut sûres)
-      if (typeof session.step === "number")     setStep(session.step);
-      if (typeof session.cvText === "string")   setCvText(session.cvText);
-      if (session.cvPdfInfo)                    setCvPdfInfo(session.cvPdfInfo);
-      if (typeof session.offreText === "string") setOffreText(session.offreText);
-      if (session.offrePdfInfo)                 setOffrePdfInfo(session.offrePdfInfo);
-      if (session.analyse)                      setAnalyse(session.analyse);
-      if (session.cvOpt)                        setCvOpt(session.cvOpt);
-      if (session.cvEdite)                      setCvEdite(session.cvEdite);
-      if (session.cvEnAnglais)                  setCvEnAnglais(session.cvEnAnglais);
-      if (typeof session.langueCV === "string") setLangueCV(session.langueCV);
-      if (typeof session.formatUS === "boolean") setFormatUS(session.formatUS);
-      if (typeof session.couleurId === "string") setCouleurId(session.couleurId);
-      if (Array.isArray(session.sectionsMasquees)) setSectionsMasquees(session.sectionsMasquees);
-      if (typeof session.secteur === "string")  setSecteur(session.secteur);
-      if (typeof session.scoreOptimise === "number") setScoreOptimise(session.scoreOptimise);
-      if (typeof session.lettre === "string")   setLettre(session.lettre);
-      if (typeof session.lettreOriginale === "string") setLettreOriginale(session.lettreOriginale);
-    } catch (err) {
-      console.warn("Restauration de session échouée :", err?.message);
-      effacerSession();
-    }
-  }, []);
-
-  // ── À chaque changement d'état important : sauvegarder la session ──
-  // Tout est conservé pour reprendre exactement où on s'était arrêté
-  useEffect(() => {
-    // Ne sauvegarde rien si on est juste sur l'écran d'accueil vierge
-    const aQqChose = step > 1 || cvText || cvPdfInfo || offreText || offrePdfInfo ||
-                     analyse || cvOpt || lettre;
-    if (!aQqChose) return;
-    sauvegarderSession({
-      step, cvText, cvPdfInfo, offreText, offrePdfInfo,
-      analyse, cvOpt, cvEdite, cvEnAnglais,
-      langueCV, formatUS, couleurId, sectionsMasquees,
-      secteur, scoreOptimise, lettre, lettreOriginale,
-    });
-  }, [step, cvText, cvPdfInfo, offreText, offrePdfInfo,
-      analyse, cvOpt, cvEdite, cvEnAnglais,
-      langueCV, formatUS, couleurId, sectionsMasquees,
-      secteur, scoreOptimise, lettre, lettreOriginale]);
-
-  const hasCV    = cvText.trim().length >= LIMITS.CV_MIN || (!!cvPdf && cvPdfInfo && !cvPdfInfo.estPhoto);
-  const hasOffre = offreText.trim().length >= LIMITS.OFFRE_MIN || (!!offrePdf && offrePdfInfo && !offrePdfInfo.estPhoto);
-  const canAnalyze = hasCV && hasOffre;
-  const canCvOpt   = analyse && !analyse.error && canAnalyze;
-
-  const startProgress = useCallback(() => {
-    setLoadingProgress(0);
-    const interval = setInterval(() => {
-      setLoadingProgress(p => p < 85 ? p + Math.random() * 8 : p);
-    }, 600);
-    return () => { clearInterval(interval); setLoadingProgress(100); };
-  }, []);
-
-  const doAnalyse = async () => {
-    if (loading || !canAnalyze) return;
-    // Analyse gratuite illimitée, plus de vérification de crédit
-    setLoading(true); setLoadingMsg("Analyse de votre CV en cours"); setStep(3); setAnalyse(null);
-    const stopProgress = startProgress();
-    try {
-      let cvContent = "";
-      if (cvPdfInfo?.texte && !cvPdfInfo.estPhoto) cvContent = limiterTexte(cvPdfInfo.texte, LIMITS.CV_MAX).texte;
-      else if (cvText) cvContent = limiterTexte(cvText, LIMITS.CV_MAX).texte;
-
-      let offreContent = "";
-      if (offrePdfInfo?.texte && !offrePdfInfo.estPhoto) offreContent = limiterTexte(offrePdfInfo.texte, LIMITS.OFFRE_MAX).texte;
-      else if (offreText) offreContent = limiterTexte(offreText, LIMITS.OFFRE_MAX).texte;
-
-      // ── ANALYSE ALGORITHMIQUE (gratuite, instantanée, sans coût API) ──
-      // Petit délai cosmétique pour donner une impression de "réflexion"
-      await new Promise(r => setTimeout(r, 600));
-      const parsed = analyserAlgo(cvContent, offreContent);
-      // Plus de débit de crédits pour l'analyse
-      setAnalyse(parsed);
-      setSecteur(parsed.secteur);
-    } catch (err) {
-      setAnalyse({ error: err.message || "Erreur inattendue durant l'analyse." });
-    }
-    stopProgress();
-    setLoading(false);
-  };
-
-  const doCvOpt = async () => {
-    if (loading || !canCvOpt) return;
-    if (credits < CREDITS.REWRITE) {
-      setCvOptError(`Il vous faut 1 action IA pour la réécriture. Achetez la recharge à 2,99 € (3 dossiers complets).`);
-      return;
-    }
-    setLoading(true); setLoadingMsg("Réécriture de votre CV"); setStep(4);
-    setCvOpt(null); setCvOptError(""); setCvEdite(null); setScoreOptimise(null);
-    setCouleurId("auto"); setSectionsMasquees([]); setModeTexte(false); setFormatUS(false);
-    setCvEnAnglais(null); setLangueCV("francais"); setTraductionError("");
-    const stopProgress = startProgress();
-    try {
-      let cvContent = "";
-      if (cvPdfInfo?.texte && !cvPdfInfo.estPhoto) cvContent = limiterTexte(cvPdfInfo.texte, LIMITS.CV_MAX).texte;
-      else if (cvText) cvContent = limiterTexte(cvText, LIMITS.CV_MAX).texte;
-
-      let offreContent = "";
-      if (offrePdfInfo?.texte && !offrePdfInfo.estPhoto) offreContent = limiterTexte(offrePdfInfo.texte, LIMITS.OFFRE_MAX).texte;
-      else if (offreText) offreContent = limiterTexte(offreText, LIMITS.OFFRE_MAX).texte;
-
-      const userText = [
-        envelopper("CV_ORIGINAL", cvContent),
-        envelopper("FICHE_POSTE", offreContent),
-        envelopper("MOTS_CLES", analyse?.motsManquants?.join(", ") || ""),
-      ].filter(Boolean).join("\n\n");
-
-      // Le CV est généré en JSON structuré : on attend la réponse complète avant de parser
-      const raw = await callClaude(PROMPT_REWRITE, userText, 2500, MODEL_OPUS);
-      if (!raw?.trim()) throw new Error("Réponse vide. Réessayez s'il vous plaît.");
-      let cv;
-      try {
-        cv = validerCV(raw);
-      } catch {
-        throw new Error("Le CV n'a pas pu être mis en forme. Réessayez s'il vous plaît.");
-      }
-      if (!cv.experiences.length && !cv.profil) {
-        throw new Error("Le CV généré est incomplet. Réessayez s'il vous plaît.");
-      }
-      setCvOpt(cv);
-      setCvEdite(cv); // copie de travail pour l'édition contrôlée
-      // Nouveau score ATS du CV réécrit (si l'IA l'a fourni et qu'il progresse)
-      if (typeof cv.nouveauScore === "number") {
-        const ancien = analyse?.score ?? 0;
-        // On garde au minimum le score initial : l'optimisation ne fait jamais baisser
-        setScoreOptimise(Math.max(cv.nouveauScore, ancien));
-      }
-      setCredits(depenseCredits(CREDITS.REWRITE));
-    } catch (err) {
-      setCvOptError(err.message || "Erreur inattendue durant la réécriture.");
-    }
-    stopProgress();
-    setLoading(false);
-  };
-
-  // ── Traduction anglaise du CV (Mode international) ───────────────
-  const doTraduction = async () => {
-    if (traduisant || !cvEdite) return;
-    setTraduisant(true); setTraductionError("");
-    try {
-      const userText = envelopper("CV_JSON", JSON.stringify(cvEdite));
-      const raw = await callClaude(PROMPT_TRADUCTION, userText, 2500, MODEL_SONNET);
-      if (!raw?.trim()) throw new Error("Réponse vide. Réessayez s'il vous plaît.");
-      let cvEn;
-      try {
-        cvEn = validerCV(raw);
-      } catch {
-        throw new Error("La traduction n'a pas pu être mise en forme. Réessayez s'il vous plaît.");
-      }
-      if (!cvEn.experiences.length && !cvEn.profil) {
-        throw new Error("La traduction est incomplète. Réessayez s'il vous plaît.");
-      }
-      setCvEnAnglais(cvEn);
-      setLangueCV("anglais");
-    } catch (err) {
-      setTraductionError(err.message || "Erreur lors de la traduction.");
-    }
-    setTraduisant(false);
-  };
-
-  // Bascule entre version française et anglaise du CV
-  const basculerLangue = (langue) => {
-    if (langue === "anglais") {
-      if (cvEnAnglais) { setLangueCV("anglais"); }
-      else { doTraduction(); }
-    } else {
-      setLangueCV("francais");
-    }
-  };
-
-  const doLettre = async () => {
-    if (loading) return;
-    if (credits < CREDITS.LETTRE) {
-      setLettreError(`Il vous faut 1 action IA pour la lettre. Achetez la recharge à 2,99 €.`);
-      return;
-    }
-    setLoading(true); setLoadingMsg("Rédaction de votre lettre de motivation"); setStep(5);
-    setLettre(""); setLettreOriginale(""); setLettreError(""); setLettreStreaming(true);
-    setLettreModeEdition(false);
-    const stopProgress = startProgress();
-    try {
-      let offreContent = "";
-      if (offrePdfInfo?.texte && !offrePdfInfo.estPhoto) offreContent = limiterTexte(offrePdfInfo.texte, LIMITS.OFFRE_MAX).texte;
-      else if (offreText) offreContent = limiterTexte(offreText, LIMITS.OFFRE_MAX).texte;
-
-      const userText = [
-        envelopper("CV", cvEdite ? cvVersTexte(cvEdite) : (cvOpt ? cvVersTexte(cvOpt) : "")),
-        envelopper("FICHE_POSTE", offreContent),
-      ].filter(Boolean).join("\n\n");
-
-      let result = "";
-      try {
-        result = await callClaudeStream(PROMPT_LETTRE, userText, 700, MODEL_SONNET, (partial) => setLettre(partial));
-      } catch {
-        result = await callClaude(PROMPT_LETTRE, userText, 700, MODEL_SONNET);
-        setLettre(result);
-      }
-      if (!result?.trim() || result.trim().length < 100) throw new Error("La réponse est trop courte. Réessayez s'il vous plaît.");
-      setLettreOriginale(result); // sauvegarde pour permettre de "Revenir à l'original"
-      setCredits(depenseCredits(CREDITS.LETTRE));
-    } catch (err) {
-      setLettreError(err.message || "Erreur inattendue durant la rédaction.");
-    }
-    setLettreStreaming(false);
-    stopProgress();
-    setLoading(false);
-  };
-
-  const reset = () => {
-    setStep(1); setCvText(""); setCvPdf(null); setCvPdfInfo(null);
-    setOffreText(""); setOffrePdf(null); setOffrePdfInfo(null);
-    setAnalyse(null); setCvOpt(null); setCvOptError(""); setLettre(""); setLettreError("");
-    setLettreOriginale(""); setLettreModeEdition(false);
-    setCvEdite(null); setCouleurId("auto"); setSectionsMasquees([]); setModeTexte(false); setFormatUS(false);
-    setCvEnAnglais(null); setLangueCV("francais"); setTraductionError(""); setScoreOptimise(null);
-    setSecteur("default"); setLoadingProgress(0);
-    setPivots(null); setPivotError(""); setShowPivot(false);
-    effacerSession(); // on efface aussi la session sauvegardée
-  };
-
-  // ── Édition contrôlée ──────────────────────────────────────────
-  // Couleur choisie : objet {primary,accent} ou null si "auto"
-  const couleurCustom = (() => {
-    const th = THEMES_CHOISISSABLES.find(x => x.id === couleurId);
-    return th && th.primary ? { primary: th.primary, accent: th.accent } : null;
-  })();
-
-  const toggleSection = (id) => {
-    setSectionsMasquees(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-  };
-
-  const resetEdition = () => {
-    setCvEdite(cvOpt);            // revient au CV généré par l'IA
-    setCouleurId("auto");
-    setSectionsMasquees([]);
-    setModeTexte(false);
-  };
-
-  // Vrai si l'utilisateur a modifié quelque chose (pour afficher le bouton "revenir")
-  const editionModifiee =
-    couleurId !== "auto" ||
-    sectionsMasquees.length > 0 ||
-    (cvEdite && cvOpt && JSON.stringify(cvEdite) !== JSON.stringify(cvOpt));
-
-  // ── Langue du CV affiché ───────────────────────────────────────
-  // Le CV montré est la version française (cvEdite) ou anglaise (cvEnAnglais)
-  const cvAffiche = (langueCV === "anglais" && cvEnAnglais) ? cvEnAnglais : cvEdite;
-
-  // L'éditeur de texte modifie la bonne version selon la langue affichée
-  const onChangeCvAffiche = (nouveauCv) => {
-    if (langueCV === "anglais" && cvEnAnglais) setCvEnAnglais(nouveauCv);
-    else setCvEdite(nouveauCv);
-  };
-
-  // ── Confirmation de paiement : crédite selon la formule choisie ──
-  const handlePaid = (formule) => {
-    const n = RECHARGE_CREDITS[formule] ?? 0;
-    if (n > 0) setCredits(ajouterCredits(n));
-    setPaid(true);
-  };
-
-  const doPivot = async () => {
-    if (pivotLoading) return;
-    if (credits < CREDITS.PIVOT) {
-      setPivotError(`Il vous faut 1 action IA pour les pistes de reconversion. Achetez la recharge à 2,99 €.`);
-      return;
-    }
-    setPivotLoading(true); setPivotError(""); setPivots(null);
-    try {
-      let cvContent = "";
-      if (cvPdfInfo?.texte && !cvPdfInfo.estPhoto) cvContent = limiterTexte(cvPdfInfo.texte, LIMITS.CV_MAX).texte;
-      else if (cvText) cvContent = limiterTexte(cvText, LIMITS.CV_MAX).texte;
-
-      const userText = envelopper("CV_CANDIDAT", cvContent);
-      const raw = await callClaude(PROMPT_PIVOT, userText, 700, MODEL_SONNET);
-      const parsed = validerPivot(raw);
-      setPivots(parsed);
-      setCredits(depenseCredits(CREDITS.PIVOT));
-    } catch (err) {
-      setPivotError(err.message || "Erreur lors de l'analyse de reconversion.");
-    }
-    setPivotLoading(false);
-  };
-
-  const handlePivotSelect = (metier) => {
-    setOffreText(`Je souhaite me reconvertir vers le métier de : ${metier}\n\nAnalyse mon profil et optimise mon CV pour cette reconversion professionnelle.`);
-    setShowPivot(false);
-    setPivots(null);
-    setAnalyse(null);
-    setStep(2);
-  };
-
-  return (
-    <div
-      translate="no"
-      className="notranslate"
-      style={{ minHeight: "100vh", background: C.bg, color: C.text, position: "relative", overflow: "hidden" }}
-    >
-      <style>{GLOBAL_STYLES}</style>
-      <PaperBG/>
-
-      <Header credits={credits} onCreditsClick={() => setShowOffres(true)}/>
-
-      {paymentSuccess && (
-        <PaymentSuccessBanner
-          formule={paymentSuccess}
-          credits={credits}
-          onClose={() => setPaymentSuccess(null)}
-        />
-      )}
-
-      <OffresModal
-        open={showOffres}
-        onClose={() => setShowOffres(false)}
-        credits={credits}
-      />
-
-      <div className="app-main-container" style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>
-
-        <StepBar current={step}/>
-
-        {/* ÉTAPE 1 — Mon CV */}
-        {step === 1 && <Card>
-          <PageTitle subtitle="Ne vous inquiétez pas, votre CV n'a pas besoin d'être parfait. C'est justement pour ça qu'on est là." hideSubtitleOnMobile>
-            Étape 1 : Votre CV actuel
-          </PageTitle>
-
-          {/* Encart de reprise de session : visible si la personne a déjà saisi qqch */}
-          {(cvText || cvPdfInfo) && (
-            <div style={{
-              background: C.successSoft,
-              border: `1px solid ${C.success}55`,
-              borderLeft: `4px solid ${C.success}`,
-              borderRadius: "10px",
-              padding: "14px 18px",
-              marginBottom: "20px",
-              fontFamily: FONT_SANS,
-              display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap",
-            }}>
-              <span style={{ fontSize: "24px", flexShrink: 0 }}>💾</span>
-              <div style={{ flex: 1, minWidth: "180px", fontSize: "14px", color: C.text, lineHeight: 1.5 }}>
-                <strong style={{ color: C.success }}>Session reprise.</strong> Vos saisies précédentes ont été conservées.
-              </div>
-              <button
-                onClick={() => { if (window.confirm("Effacer toutes vos saisies et repartir de zéro ?")) reset(); }}
-                style={{
-                  padding: "8px 14px",
-                  borderRadius: "8px",
-                  border: `1px solid ${C.borderStrong}`,
-                  background: C.bgCard,
-                  color: C.textSecondary,
-                  fontSize: "13px", fontWeight: 600, fontFamily: FONT_SANS,
-                  cursor: "pointer",
-                }}
-              >
-                🔄 Nouvelle candidature
-              </button>
-            </div>
-          )}
-
-          <DualInput
-            label="Collez votre CV ou envoyez le PDF"
-            hint="Si votre CV est dans un fichier Word ou PDF, sélectionnez tout le texte, copiez-le, et collez-le ici."
-            textValue={cvText} onTextChange={setCvText}
-            pdfFile={cvPdf} onPdfChange={setCvPdf}
-            pdfInfo={cvPdfInfo} onPdfInfo={setCvPdfInfo}
-            maxChars={LIMITS.CV_MAX}
-            placeholder={"Jean Dupont\nDirecteur Commercial\n\nEXPÉRIENCE\n2018-2024 : Directeur Régional\n• Gestion d'une équipe de 12 commerciaux\n\nFORMATION\nBac +5 Commerce — 1995"}
-          />
-
-          <div style={{ marginTop: "28px" }}>
-            <PrimaryBtn onClick={() => setStep(2)} disabled={!hasCV} icon="→" variant="primary">
-              Continuer vers l'étape 2
-            </PrimaryBtn>
-          </div>
-
-          {!hasCV && (
-            <p style={{ fontSize: "14px", color: C.textMuted, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS }}>
-              Ajoutez votre CV pour pouvoir continuer.
-            </p>
-          )}
-        </Card>}
-
-        {/* ÉTAPE 2 — L'offre */}
-        {step === 2 && <Card>
-          <PageTitle subtitle="Copiez le texte de l'annonce qui vous intéresse. Plus l'offre est complète, meilleure sera l'analyse.">
-            Étape 2 : L'offre d'emploi visée
-          </PageTitle>
-
-          <DualInput
-            label="Collez l'annonce ou envoyez son PDF"
-            hint="Vous trouverez le texte sur Pôle Emploi, Indeed, LinkedIn, ou directement sur le site de l'entreprise."
-            textValue={offreText} onTextChange={setOffreText}
-            pdfFile={offrePdf} onPdfChange={setOffrePdf}
-            pdfInfo={offrePdfInfo} onPdfInfo={setOffrePdfInfo}
-            maxChars={LIMITS.OFFRE_MAX}
-            placeholder={"Titre du poste — CDI\n\nMissions :\n- ...\n\nProfil recherché :\n- ..."}
-          />
-
-          <div style={{ display: "flex", gap: "12px", marginTop: "28px", flexWrap: "wrap" }}>
-            <SecondaryBtn onClick={() => setStep(1)}>← Étape précédente</SecondaryBtn>
-            <div style={{ flex: 1, minWidth: "240px" }}>
-              <PrimaryBtn onClick={doAnalyse} disabled={!canAnalyze} loading={loading} icon="🔍" variant="primary">
-                Lancer l'analyse — gratuit
-              </PrimaryBtn>
-            </div>
-          </div>
-        </Card>}
-
-        {/* ÉTAPE 3 — Analyse */}
-        {step === 3 && <Card>
-          <PageTitle subtitle="Voici comment votre CV correspond actuellement à l'offre. Nous allons l'améliorer ensuite.">
-            Étape 3 : Résultats de l'analyse
-          </PageTitle>
-
-          {loading && <Spinner text={loadingMsg} progress={loadingProgress}/>}
-
-          {!loading && analyse && !analyse.error && <>
-            <ScoreBadge score={analyse.score}/>
-
-            {analyse.conseil && (
-              <div style={{
-                background: C.primarySoft,
-                border: `1px solid ${C.primary}33`,
-                borderLeft: `4px solid ${C.primary}`,
-                borderRadius: "12px",
-                padding: "20px 22px",
-                marginBottom: "24px",
-                fontFamily: FONT_SANS,
-              }}>
-                <div style={{ fontSize: "13px", fontWeight: 700, color: C.primary, marginBottom: "8px", letterSpacing: "0.06em", textTransform: "uppercase" }}>
-                  💡 Conseil personnalisé
-                </div>
-                <div style={{ fontSize: "16px", color: C.text, lineHeight: 1.6, fontFamily: FONT_SERIF }}>
-                  {analyse.conseil}
-                </div>
-              </div>
-            )}
-
-            {analyse.motsPresents.length > 0 && (
-              <div style={{ marginBottom: "20px" }}>
-                <div style={{ fontSize: "15px", fontWeight: 700, color: C.success, marginBottom: "10px", fontFamily: FONT_SANS, display: "flex", alignItems: "center", gap: "8px" }}>
-                  ✅ Mots-clés déjà présents dans votre CV ({analyse.motsPresents.length})
-                </div>
-                <Tags items={analyse.motsPresents} color={C.success} bg={C.successSoft}/>
-              </div>
-            )}
-
-            {analyse.motsManquants.length > 0 && (
-              <div style={{ marginBottom: "24px" }}>
-                <div style={{ fontSize: "15px", fontWeight: 700, color: C.error, marginBottom: "10px", fontFamily: FONT_SANS, display: "flex", alignItems: "center", gap: "8px" }}>
-                  ❌ Mots-clés manquants — nous les ajouterons ({analyse.motsManquants.length})
-                </div>
-                <Tags items={analyse.motsManquants} color={C.error} bg={C.errorSoft}/>
-              </div>
-            )}
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "14px", marginBottom: "28px" }}>
-              {analyse.pointsForts.length > 0 && (
-                <div style={{ background: C.successSoft, border: `1px solid ${C.success}33`, borderRadius: "12px", padding: "18px 22px", fontFamily: FONT_SANS }}>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: C.success, marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    Vos points forts
-                  </div>
-                  {analyse.pointsForts.map((p, i) => (
-                    <p key={i} style={{ fontSize: "15px", color: C.text, marginBottom: "6px", lineHeight: 1.6, margin: "0 0 6px" }}>
-                      • {p}
-                    </p>
-                  ))}
-                </div>
-              )}
-              {analyse.pointsFaibles.length > 0 && (
-                <div style={{ background: C.warningSoft, border: `1px solid ${C.warning}33`, borderRadius: "12px", padding: "18px 22px", fontFamily: FONT_SANS }}>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: "#7A5A14", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    À améliorer
-                  </div>
-                  {analyse.pointsFaibles.map((p, i) => (
-                    <p key={i} style={{ fontSize: "15px", color: C.text, marginBottom: "6px", lineHeight: 1.6, margin: "0 0 6px" }}>
-                      • {p}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-              <SecondaryBtn onClick={() => setStep(2)}>← Modifier l'offre</SecondaryBtn>
-              <div style={{ flex: 1, minWidth: "240px" }}>
-                <PrimaryBtn onClick={doCvOpt} loading={loading} icon="✨" variant="accent">
-                  Réécrire mon CV — 1 action IA
-                </PrimaryBtn>
-              </div>
-            </div>
-
-            {/* Bloc reconversion */}
-            <div style={{
-              marginTop: "32px", paddingTop: "28px",
-              borderTop: `1px solid ${C.border}`,
-              fontFamily: FONT_SANS,
-            }}>
-              <div style={{ marginBottom: "12px" }}>
-                <h3 style={{
-                  margin: 0, fontSize: "20px", fontFamily: FONT_SERIF, fontWeight: 600, color: C.text,
-                }}>
-                  Vous envisagez une reconversion ?
-                </h3>
-                <p style={{ margin: "6px 0 0", fontSize: "15px", color: C.textSecondary, lineHeight: 1.6 }}>
-                  Découvrez 3 métiers où votre expérience devient un véritable atout (1 action IA).
-                </p>
-              </div>
-
-              {!pivots && !pivotLoading && !showPivot && (
-                <button
-                  onClick={() => { setShowPivot(true); doPivot(); }}
-                  disabled={credits < CREDITS.PIVOT}
-                  style={{
-                    width: "100%",
-                    minHeight: "56px",
-                    padding: "14px 22px",
-                    borderRadius: "12px",
-                    border: `2px solid ${C.borderStrong}`,
-                    background: C.bgSubtle,
-                    color: C.primary,
-                    fontSize: "16px",
-                    fontWeight: 600,
-                    fontFamily: FONT_SANS,
-                    cursor: credits < CREDITS.PIVOT ? "not-allowed" : "pointer",
-                    opacity: credits < CREDITS.PIVOT ? 0.5 : 1,
-                    transition: "all 0.15s ease",
-                  }}
-                  onMouseEnter={e => { if (credits >= CREDITS.PIVOT) { e.currentTarget.style.background = C.primarySoft; e.currentTarget.style.borderColor = C.primary; } }}
-                  onMouseLeave={e => { e.currentTarget.style.background = C.bgSubtle; e.currentTarget.style.borderColor = C.borderStrong; }}
-                >
-                  Voir mes pistes de reconversion →
-                </button>
-              )}
-              {pivotLoading && <Spinner text="Analyse de vos compétences transférables"/>}
-              {pivotError && <InfoBox kind="error">{pivotError}</InfoBox>}
-              {pivots && !pivotLoading && <PivotCard pivots={pivots} onSelect={handlePivotSelect}/>}
-            </div>
-          </>}
-
-          {!loading && analyse?.error && <ErrorBox message={analyse.error} onRetry={doAnalyse} onBack={() => setStep(2)}/>}
-        </Card>}
-
-        {/* ÉTAPE 4 — CV optimisé */}
-        {step === 4 && <Card>
-          <PageTitle subtitle="Voici votre CV réécrit pour passer les filtres automatiques et marquer le recruteur.">
-            Étape 4 : Votre CV optimisé
-          </PageTitle>
-
-          {loading && !cvOpt && <Spinner text={loadingMsg} progress={loadingProgress}/>}
-          {!loading && cvOptError && <ErrorBox message={cvOptError} onRetry={doCvOpt} onBack={() => setStep(3)}/>}
-
-          {cvOpt && cvEdite && !cvOptError && !loading && <div>
-            {scoreOptimise !== null && analyse && (
-              <ScoreProgression scoreAvant={analyse.score} scoreApres={scoreOptimise}/>
-            )}
-            <PactePersonnalisation
-              onPersonnaliser={() => setModeTexte(true)}
-              dejaCorrige={editionModifiee}
-            />
-            <CVPreview
-              cv={cvAffiche}
-              secteur={secteur}
-              avecPhoto={!!cvPdfInfo?.aPhoto}
-              couleurCustom={couleurCustom}
-              sectionsMasquees={sectionsMasquees}
-              formatUS={formatUS}
-              langue={langueCV}
-            />
-
-            {cvPdfInfo?.aPhoto && !formatUS && (
-              <InfoBox kind="info">
-                <strong>Votre CV original contenait une photo.</strong> Un emplacement a été prévu en haut à gauche
-                de votre nouveau CV pour la rajouter. À noter : de plus en plus de recruteurs recommandent un CV
-                <strong> sans photo</strong> pour éviter tout biais — c'est vous qui choisissez.
-              </InfoBox>
-            )}
-
-            {/* Choix du format : français ou international */}
-            <div style={{ marginTop: "20px" }}>
-              <SelecteurFormat
-                formatUS={formatUS}
-                onChange={(val) => {
-                  setFormatUS(val);
-                  // Le format français n'existe qu'en français : on repasse en FR
-                  if (!val) setLangueCV("francais");
-                }}
-                recommandeInternational={analyse?.formatRecommande === "international"}
-              />
-            </div>
-
-            {/* Choix de la langue — uniquement en format international */}
-            {formatUS && (
-              <SelecteurLangue
-                langueCV={langueCV}
-                onChange={basculerLangue}
-                traduisant={traduisant}
-                traductionError={traductionError}
-                recommandeAnglais={analyse?.langueRecommandee === "anglais"}
-                dejaTraduit={!!cvEnAnglais}
-              />
-            )}
-
-            {/* Barre de personnalisation */}
-            <BarreEdition
-              couleurId={couleurId}
-              onCouleur={setCouleurId}
-              sectionsMasquees={sectionsMasquees}
-              onToggleSection={toggleSection}
-              modeTexte={modeTexte}
-              onToggleTexte={() => setModeTexte(m => !m)}
-              onReset={resetEdition}
-              peutReset={editionModifiee}
-              masquerCouleurs={formatUS}
-            />
-
-            {/* Éditeur de texte (si activé) */}
-            {modeTexte && (
-              <EditeurTexteCV cv={cvAffiche} onChange={onChangeCvAffiche}/>
-            )}
-
-            <div style={{ display: "flex", gap: "12px", marginTop: "4px", flexWrap: "wrap" }}>
-              {paid
-                ? <CopyBtn text={cvVersTexte(cvAffiche)}/>
-                : <LockedBtn label="Débloquer la copie — dès 2,99 €" onUnlock={() => setShowOffres(true)}/>
-              }
-            </div>
-
-            <div style={{ marginTop: "20px" }}>
-              <ConseilATS variant="etape4"/>
-              {paid ? (
-                <PrimaryBtn
-                  onClick={() => downloadCV(cvAffiche, secteur, {
-                    avecPhoto: !!cvPdfInfo?.aPhoto,
-                    couleurCustom,
-                    sectionsMasquees,
-                    formatUS,
-                    langue: langueCV,
-                  })}
-                  icon="⬇️" variant="success"
-                >
-                  Télécharger mon CV en PDF
-                </PrimaryBtn>
-              ) : (
-                <LockedBtn
-                  label="Débloquer le téléchargement — dès 2,99 €"
-                  onUnlock={() => setShowOffres(true)}
-                  fullWidth big
-                />
-              )}
-            </div>
-
-            {paid && (
-              <p style={{ fontSize: "14px", color: C.textMuted, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
-                {formatUS ? "" : "Vérifiez vos coordonnées à gauche au préalable. "}Dans la fenêtre d'impression, choisissez <strong>« Enregistrer au format PDF »</strong>. Pensez aussi à <strong>désactiver les en-têtes et pieds de page</strong> dans les options du navigateur pour un rendu impeccable.
-              </p>
-            )}
-            {!paid && (
-              <p style={{ fontSize: "14px", color: C.textSecondary, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
-                Votre CV est prêt. Pour le récupérer en PDF ou le copier, une <strong style={{ color: C.accent }}>recharge à 2,99 €</strong> suffit.
-              </p>
-            )}
-
-            <div style={{ display: "flex", gap: "12px", marginTop: "24px", flexWrap: "wrap" }}>
-              <SecondaryBtn onClick={() => setStep(3)}>← Analyse</SecondaryBtn>
-              <div style={{ flex: 1, minWidth: "240px" }}>
-                <PrimaryBtn onClick={doLettre} loading={loading} icon="✉️" variant="primary">
-                  Générer ma lettre — incluse dans le dossier
-                </PrimaryBtn>
-              </div>
-            </div>
-          </div>}
-        </Card>}
-
-        {/* ÉTAPE 5 — Lettre */}
-        {step === 5 && <Card>
-          <PageTitle subtitle="Une lettre courte, personnalisée et qui valorise votre expérience.">
-            Étape 5 : Votre lettre de motivation
-          </PageTitle>
-
-          {loading && !lettre && <Spinner text={loadingMsg} progress={loadingProgress}/>}
-          {!loading && lettreError && <ErrorBox message={lettreError} onRetry={doLettre} onBack={() => setStep(4)}/>}
-
-          {lettre && !lettreError && <div>
-            <PreviewBanner/>
-            <div style={{ height: "16px" }}/>
-
-            {/* Affichage : texte simple (lecture) OU zone éditable (édition) */}
-            {lettreModeEdition ? (
-              <textarea
-                value={lettre}
-                onChange={(e) => setLettre(e.target.value)}
-                style={{
-                  width: "100%",
-                  minHeight: "320px",
-                  padding: "20px 22px",
-                  borderRadius: "12px",
-                  border: `2px solid ${C.primary}`,
-                  background: C.bgSubtle,
-                  color: C.text,
-                  fontSize: "15px",
-                  lineHeight: 1.7,
-                  fontFamily: FONT_SANS,
-                  resize: "vertical",
-                  outline: "none",
-                }}
-              />
-            ) : (
-              <StreamingText text={lettre} isStreaming={lettreStreaming}/>
-            )}
-
-            {!lettreStreaming && <>
-              {/* Boutons d'édition : activer/désactiver + revenir à l'original */}
-              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginTop: "16px" }}>
-                <button
-                  onClick={() => setLettreModeEdition(m => !m)}
-                  style={{
-                    padding: "12px 20px",
-                    borderRadius: "10px",
-                    border: `2px solid ${lettreModeEdition ? C.primary : C.borderStrong}`,
-                    background: lettreModeEdition ? C.primarySoft : C.bgCard,
-                    color: lettreModeEdition ? C.primary : C.textSecondary,
-                    fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS,
-                    cursor: "pointer",
-                  }}
-                >
-                  {lettreModeEdition ? "✓ Modification activée" : "✏️ Corriger ma lettre"}
-                </button>
-                {lettreOriginale && lettre !== lettreOriginale && (
-                  <button
-                    onClick={() => setLettre(lettreOriginale)}
-                    style={{
-                      padding: "12px 20px",
-                      borderRadius: "10px",
-                      border: `2px solid ${C.borderStrong}`,
-                      background: C.bgCard,
-                      color: C.textMuted,
-                      fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS,
-                      cursor: "pointer",
-                    }}
-                  >
-                    ↩️ Revenir à la version d'origine
-                  </button>
-                )}
-              </div>
-
-              <div style={{ display: "flex", gap: "12px", marginTop: "16px", flexWrap: "wrap" }}>
-                {paid
-                  ? <CopyBtn text={lettre}/>
-                  : <LockedBtn label="Débloquer la copie — dès 2,99 €" onUnlock={() => setShowOffres(true)}/>
-                }
-              </div>
-
-              <div style={{ marginTop: "16px" }}>
-                {paid ? (
-                  <PrimaryBtn onClick={() => downloadLettre(lettre)} icon="⬇️" variant="success">
-                    Télécharger ma lettre en PDF
-                  </PrimaryBtn>
-                ) : (
-                  <LockedBtn
-                    label="Débloquer le téléchargement — dès 2,99 €"
-                    onUnlock={() => setShowOffres(true)}
-                    fullWidth big
-                  />
-                )}
-              </div>
-
-              {paid && (
-                <p style={{ fontSize: "14px", color: C.textMuted, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
-                  Dans la fenêtre d'impression, choisissez <strong>« Enregistrer au format PDF »</strong>. Pensez aussi à <strong>désactiver les en-têtes et pieds de page</strong> dans les options du navigateur pour un rendu impeccable.
-                </p>
-              )}
-              {!paid && (
-                <p style={{ fontSize: "14px", color: C.textSecondary, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
-                  Votre lettre est prête. Pour la récupérer en PDF ou la copier, <strong style={{ color: C.accent }}>2,99 €</strong> suffit.
-                </p>
-              )}
-
-              <div style={{
-                marginTop: "32px",
-                background: C.successSoft,
-                border: `1px solid ${C.success}40`,
-                borderRadius: "14px",
-                padding: "24px 26px",
-                fontFamily: FONT_SANS,
-              }}>
-                <div style={{ fontSize: "20px", fontWeight: 700, color: C.success, marginBottom: "14px", fontFamily: FONT_SERIF }}>
-                  🎉 Votre dossier de candidature est complet
-                </div>
-                <div style={{ fontSize: "16px", color: C.text, lineHeight: 2 }}>
-                  ✓ Score de compatibilité : <strong style={{ color: C.success }}>{scoreOptimise ?? analyse?.score}%</strong><br/>
-                  ✓ CV optimisé sur 1 page avec {analyse?.motsManquants?.length ?? 0} mots-clés ajoutés<br/>
-                  ✓ Lettre de motivation personnalisée
-                </div>
-                <ConseilATS variant="etape5"/>
-              </div>
-
-              <div style={{ display: "flex", gap: "12px", marginTop: "24px", flexWrap: "wrap" }}>
-                <SecondaryBtn onClick={() => setStep(4)}>← CV</SecondaryBtn>
-                <div style={{ flex: 1, minWidth: "240px" }}>
-                  <PrimaryBtn onClick={reset} icon="🔄" variant="primary">
-                    Préparer une nouvelle candidature
-                  </PrimaryBtn>
-                </div>
-              </div>
-            </>}
-          </div>}
-        </Card>}
-
-        {/* Bandeau crédits épuisés */}
-        {credits === 0 && step < 4 && (
-          <div style={{
-            marginTop: "24px",
-            background: C.bgCard,
-            border: `1px solid ${C.accent}55`,
-            borderRadius: "14px",
-            padding: "28px 24px",
-            textAlign: "center",
-            fontFamily: FONT_SANS,
-          }}>
-            <div style={{ fontSize: "40px", marginBottom: "12px" }}>🎟️</div>
-            <h3 style={{
-              fontSize: "22px", fontWeight: 700, color: C.text,
-              fontFamily: FONT_SERIF, margin: "0 0 10px",
-            }}>
-              Vous n'avez pas encore d'actions IA
-            </h3>
-            <p style={{
-              fontSize: "16px", color: C.textSecondary,
-              maxWidth: "440px", margin: "0 auto 20px", lineHeight: 1.6,
-            }}>
-              Choisissez la formule qui vous convient pour continuer à optimiser vos candidatures :
-            </p>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "420px", margin: "0 auto" }}>
-              <a href={STRIPE_ANNUEL} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <div style={{
-                  padding: "16px 20px",
-                  background: C.accent, color: "#FFF",
-                  fontSize: "16px", fontWeight: 700,
-                  borderRadius: "12px", position: "relative",
-                  boxShadow: "0 4px 12px rgba(168,93,44,0.25)",
-                }}>
-                  <div style={{ position: "absolute", top: "-10px", right: "16px", background: C.success, color: "#FFF", fontSize: "11px", padding: "3px 10px", borderRadius: "10px", fontWeight: 700 }}>
-                    ★ Meilleure offre
-                  </div>
-                  Annuel — 49,99 € (60 dossiers complets)
-                </div>
-              </a>
-              <a href={STRIPE_MENSUEL} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <div style={{
-                  padding: "14px 20px",
-                  background: C.bgCard, color: C.primary,
-                  border: `2px solid ${C.primary}`,
-                  fontSize: "15px", fontWeight: 600,
-                  borderRadius: "12px",
-                }}>
-                  Mensuel — 5,99 € / mois (8 dossiers / mois)
-                </div>
-              </a>
-              <a href={STRIPE_RECHARGE} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <div style={{
-                  padding: "14px 20px",
-                  background: C.bgCard, color: C.textSecondary,
-                  border: `1px solid ${C.borderStrong}`,
-                  fontSize: "14px", fontWeight: 600,
-                  borderRadius: "12px",
-                }}>
-                  Recharge ponctuelle — 2,99 € (3 dossiers complets)
-                </div>
-              </a>
-            </div>
-
-            <div style={{ fontSize: "12px", color: C.textMuted, marginTop: "16px", fontStyle: "italic" }}>
-              🔒 Paiement sécurisé Stripe · Sans engagement
-            </div>
-          </div>
-        )}
-
-        <Footer/>
-      </div>
-    </div>
-  );
-}
+          <input

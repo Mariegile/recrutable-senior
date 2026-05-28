@@ -13,11 +13,10 @@ import { useState, useRef, useEffect, useCallback } from "react";
 // ═══════════════════════════════════════════════════════════════════
 
 // ── Liens Stripe Officiels ─────────────────────────────────────────
-// ⚠️ URLs Stripe à mettre à jour avec les nouvelles formules (Lala doit créer les nouveaux produits)
-const STRIPE_MENSUEL  = "https://buy.stripe.com/9B6eVe9Qc4lD9JQcL5eEo02"; // 5,99 € / mois - À METTRE À JOUR
-const STRIPE_ANNUEL   = "https://buy.stripe.com/4gM8wQ7I4aK12hobH1eEo01"; // 49,99 € / an - À METTRE À JOUR
-const STRIPE_RECHARGE = "https://buy.stripe.com/fZu00k2nKcS92ho9yTeEo00"; // 2,99 € recharge - À METTRE À JOUR
-const SUPPORT_EMAIL   = "contact@recrutable.fr";
+const STRIPE_MENSUEL  = "https://buy.stripe.com/eVq6oI3rObO509g26reEo04"; // 5,99 € / mois
+const STRIPE_ANNUEL   = "https://buy.stripe.com/eVqdRa9Qcg4lf4a4ezeEo03"; // 49,99 € / an
+const STRIPE_RECHARGE = "https://buy.stripe.com/cNicN61jGf0hg8ecL5eEo05"; // 2,99 € recharge
+const SUPPORT_EMAIL   = "metamax973@gmail.com";
 
 // ── Coût en crédits par action ─────────────────────────────────────
 // ── Coût en crédits par action ─────────────────────────────────────

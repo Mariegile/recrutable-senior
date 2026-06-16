@@ -422,6 +422,12 @@ OBJECTIF : Reecrire le CV pour qu il passe les filtres ATS et tienne sur UNE SEU
 Integre un maximum de mots-cles fournis. Formulations courtes et percutantes. N invente JAMAIS de donnees absentes du CV original.
 Valorise l experience et la maturite professionnelle sans jamais mentionner l age.
 
+OPTIMISATION ATS (important) :
+- Reprends LES TERMES EXACTS de la fiche de poste quand le candidat possede deja la competence (ecris le mot de l annonce, pas seulement un synonyme).
+- Pour chaque sigle, ecris les DEUX formes la premiere fois : forme developpee suivie du sigle entre parentheses (ex : "referencement naturel (SEO)", "ressources humaines (RH)").
+- Privilegie des puces chiffrees (verbe d action + resultat + chiffre), MAIS uniquement avec des chiffres deja presents dans le CV original. N invente aucun chiffre.
+- N empile pas les mots-cles artificiellement : ils doivent apparaitre naturellement dans des phrases.
+
 REGLE DE LONGUEUR STRICTE (tenir sur 1 page) :
 - Profil : 2 a 3 phrases maximum.
 - Maximum 4 experiences, les plus pertinentes et recentes.
@@ -632,17 +638,65 @@ function extraireMotsCles(texteOffre, secteur) {
 }
 
 // ── Comparer CV vs offre : mots présents / manquants ──────────────
+// ── Synonymes FR : un mot de l'offre peut etre exprime autrement dans le CV ──
+const SYNONYMES = {
+  management:    ["encadrement", "encadr", "pilotage", "pilot", "direction", "dirig", "supervision", "responsable"],
+  manager:       ["encadrement", "encadr", "pilotage", "pilot", "direction", "dirig", "responsable", "chef"],
+  encadrement:   ["management", "manager", "pilotage", "supervision"],
+  pilotage:      ["management", "gestion", "pilot", "conduite"],
+  gestion:       ["pilotage", "administration", "management"],
+  developpement: ["croissance", "expansion", "developp"],
+  croissance:    ["developpement", "expansion", "progression"],
+  ventes:        ["vente", "commercial", "commerce", "negociation"],
+  commercial:    ["vente", "commerce", "negociation"],
+  client:        ["clientele", "clients", "relation client"],
+  clients:       ["clientele", "relation client", "client"],
+  budget:        ["budgetaire", "financier", "finances"],
+  projet:        ["projets", "chantier", "mission", "programme"],
+  projets:       ["projet", "chantier", "mission", "programme"],
+  equipe:        ["equipes", "collaborateurs", "effectif", "brigade"],
+  equipes:       ["equipe", "collaborateurs", "effectif"],
+  recrutement:   ["embauche", "sourcing", "talent"],
+  formation:     ["pedagogie", "enseignement", "apprentissage"],
+  strategie:     ["strategique", "vision"],
+};
+
+// ── Sigles : on accepte le sigle OU sa forme developpee, dans les deux sens ──
+const ACRONYMES = [
+  ["seo", "referencement naturel"],
+  ["rh", "ressources humaines"],
+  ["sirh", "systeme information ressources humaines"],
+  ["roi", "retour sur investissement"],
+  ["kpi", "indicateur performance"],
+  ["crm", "gestion relation client"],
+  ["erp", "progiciel gestion integre"],
+  ["caces", "conduite engins"],
+  ["haccp", "hygiene securite alimentaire"],
+  ["qse", "qualite securite environnement"],
+];
+
+// Renvoie le mot-cle + toutes ses variantes (synonymes et formes de sigle)
+function variantesMotCle(mc) {
+  const v = new Set([mc]);
+  (SYNONYMES[mc] || []).forEach(s => v.add(s));
+  for (const [sigle, forme] of ACRONYMES) {
+    if (mc === sigle) v.add(forme);
+    else if (forme.split(" ").includes(mc)) v.add(sigle);
+  }
+  return [...v];
+}
+
 function comparerMotsCles(motsCles, texteCV) {
   const cvNorm = texteCV.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const presents = [], manquants = [];
   for (const mc of motsCles) {
-    // recherche tolérante : mot entier ou racine
-    const regex = new RegExp(`\\b${mc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\w*`, "i");
-    if (regex.test(cvNorm)) {
-      presents.push(mc);
-    } else {
-      manquants.push(mc);
-    }
+    // present si le mot OU une de ses variantes (synonyme/sigle) figure dans le CV
+    const trouve = variantesMotCle(mc).some(variante => {
+      const regex = new RegExp(`\\b${variante.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\w*`, "i");
+      return regex.test(cvNorm);
+    });
+    if (trouve) presents.push(mc);
+    else manquants.push(mc);
   }
   return { presents: presents.slice(0, 10), manquants: manquants.slice(0, 10) };
 }
@@ -921,34 +975,32 @@ function genererCvHtml(cv, secteur, opts = {}) {
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:210mm;font-family:${t.font};color:#222;background:#fff;font-size:9.5pt;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .page{width:210mm;min-height:297mm;max-height:297mm;overflow:hidden;display:flex;flex-direction:column}
-.top-bar{background:${t.primary};padding:15px 26px;border-bottom:4px solid ${t.accent}}
-.candidate-name{font-size:20pt;font-weight:700;color:#fff;letter-spacing:0.3px}
+.top-bar{background:${t.primary};padding:16px 26px;border-bottom:4px solid ${t.accent};display:flex;align-items:center;justify-content:space-between;gap:18px}
+.id-block{min-width:0}
+.candidate-name{font-size:21pt;font-weight:700;color:#fff;letter-spacing:0.3px}
 .candidate-title{font-size:10.5pt;color:rgba(255,255,255,0.88);margin-top:3px;font-style:italic}
-.layout{display:flex;flex:1;overflow:hidden}
-.sidebar{width:62mm;background:${t.primary}f2;padding:20px 15px}
-.main{flex:1;padding:18px 22px}
-.photo-box{width:34mm;height:34mm;margin:0 auto 16px;border:2px dashed rgba(255,255,255,0.5);border-radius:6px;display:flex;align-items:center;justify-content:center}
-.photo-inner{color:rgba(255,255,255,0.7);font-size:7.5pt;text-align:center;line-height:1.4}
-.section-title{font-size:8pt;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:${t.accent};border-bottom:1.5px solid ${t.accent};padding-bottom:3px;margin:13px 0 7px}
+.photo-box{width:26mm;height:26mm;border:2px dashed rgba(255,255,255,0.5);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.photo-inner{color:rgba(255,255,255,0.7);font-size:6.5pt;text-align:center;line-height:1.3}
+.contact-bar{display:flex;flex-wrap:wrap;gap:4px 20px;padding:8px 26px;background:${t.accent}14;border-bottom:1px solid ${t.accent}55}
+.contact-bar p{font-size:8.6pt;color:#333}
+.main{flex:1;padding:15px 26px}
+.section-title{font-size:8.2pt;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:${t.accent};border-bottom:1.5px solid ${t.accent};padding-bottom:3px;margin:14px 0 7px}
 .section-title:first-child{margin-top:0}
-.sidebar .section-title{color:rgba(255,255,255,0.78);border-bottom-color:rgba(255,255,255,0.28);margin-top:16px}
-.sidebar .section-title:first-of-type{margin-top:0}
-.sidebar p{color:rgba(255,255,255,0.92);font-size:8.4pt;margin-bottom:5px}
 .profil{font-size:9pt;line-height:1.55;text-align:justify;margin-bottom:4px}
 .exp-item{margin-bottom:8px}
-.exp-head{font-size:9.3pt;line-height:1.3}
+.exp-head{font-size:9.4pt;line-height:1.3}
 .exp-role{font-weight:700;color:#1a1a1a}
 .exp-company{font-weight:600;color:${t.primary}}
 .exp-dates{font-size:7.8pt;color:#888;font-style:italic;margin:1px 0 3px}
-.main ul{padding-left:14px;margin:2px 0 4px}
-.main li{font-size:8.6pt;line-height:1.4;margin-bottom:1.5px}
-.form-item{margin-bottom:4px;font-size:8.8pt;display:flex;gap:8px}
+.main ul{padding-left:16px;margin:2px 0 5px}
+.main li{font-size:8.8pt;line-height:1.42;margin-bottom:2px}
+.form-item{margin-bottom:4px;font-size:8.9pt;display:flex;gap:8px}
 .form-years{font-weight:700;color:${t.accent};white-space:nowrap;min-width:62px}
 .form-label{color:#333}
-.langues{font-size:8.8pt}
-[contenteditable]{outline:none;border-bottom:1px dashed rgba(255,255,255,0.35);cursor:text}
-[contenteditable]:focus{background:rgba(255,255,255,0.12)}
-.hint{background:#fff3cd;color:#856404;font-size:6.5pt;padding:3px 6px;border-radius:3px;margin-bottom:10px;border:1px solid #ffc107}
+.langues{font-size:8.9pt}
+[contenteditable]{outline:none;border-bottom:1px dashed #c0c0c0;cursor:text}
+[contenteditable]:focus{background:${t.accent}1A}
+.hint{background:#fff3cd;color:#856404;font-size:6.5pt;padding:3px 8px;margin:8px 26px 0;border-radius:3px;border:1px solid #ffc107}
 .footer-note{font-size:6pt;color:#bbb;text-align:center;padding:5px;border-top:1px solid #eee}
 @media print{.hint,.footer-note{display:none}[contenteditable]{border-bottom:none}}`;
 
@@ -962,7 +1014,7 @@ html,body{width:210mm;font-family:${t.font};color:#222;background:#fff;font-size
 
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>CV ${esc(cv.nom)}</title>
 <style>${css}</style></head>
-<body><div class="page"><div class="top-bar"><div class="candidate-name">${esc(cv.nom)}</div><div class="candidate-title">${esc(cv.titre)}</div></div><div class="layout"><div class="sidebar">${photoBloc}${hintBloc}<div class="section-title">Contact</div>${ligneContact("📧", cv.contact.email, "votre@email.com")}${ligneContact("📞", cv.contact.telephone, "06 XX XX XX XX")}${ligneContact("📍", cv.contact.ville, "Votre ville")}${ligneContact("🔗", cv.contact.linkedin, "linkedin.com/in/profil")}</div><div class="main">${mainSections}</div></div>${footerBloc}</div></body></html>`;
+<body><div class="page"><div class="top-bar"><div class="id-block"><div class="candidate-name">${esc(cv.nom)}</div><div class="candidate-title">${esc(cv.titre)}</div></div>${photoBloc}</div>${hintBloc}<div class="contact-bar">${ligneContact("📧", cv.contact.email, "votre@email.com")}${ligneContact("📞", cv.contact.telephone, "06 XX XX XX XX")}${ligneContact("📍", cv.contact.ville, "Votre ville")}${ligneContact("🔗", cv.contact.linkedin, "linkedin.com/in/profil")}</div><div class="main">${mainSections}</div>${footerBloc}</div></body></html>`;
 }
 
 // ── Template FORMAT AMÉRICAIN / INTERNATIONAL ──────────────────────
@@ -1294,6 +1346,66 @@ const GLOBAL_STYLES = `
       padding: 28px 16px !important;
     }
   }
+
+  /* ===============================================================
+     REFONTE ORDI — vrai layout desktop. Mobile (<640px) inchange.
+     =============================================================== */
+  @media (min-width: 640px) {
+    .notranslate {
+      background:
+        radial-gradient(1100px 560px at 100% -8%, ${C.primary}12, transparent 60%),
+        radial-gradient(900px 520px at -8% 108%, ${C.accent}14, transparent 55%),
+        ${C.bg} !important;
+    }
+    .app-header {
+      background: rgba(255,255,255,0.82) !important;
+      backdrop-filter: saturate(150%) blur(12px);
+      -webkit-backdrop-filter: saturate(150%) blur(12px);
+      border-bottom: 1px solid ${C.border} !important;
+      box-shadow: 0 10px 30px -24px rgba(20,30,50,.55) !important;
+      padding: 18px 48px !important;
+    }
+    .app-header-inner { max-width: none !important; }
+    .app-header h1 { font-size: 28px !important; letter-spacing: -0.02em !important; }
+    .app-header-tagline { font-size: 15px !important; }
+    .app-main-container { max-width: none !important; padding: 40px 48px 90px !important; }
+    .main-card {
+      padding: 44px 48px !important; border-radius: 22px !important;
+      box-shadow: 0 1px 2px rgba(20,30,50,.04), 0 30px 64px -44px rgba(20,30,50,.5) !important;
+    }
+    .step-bar-wrap {
+      border-radius: 18px !important;
+      box-shadow: 0 1px 2px rgba(20,30,50,.04), 0 20px 44px -34px rgba(20,30,50,.4) !important;
+    }
+    .page-title-h2 { font-size: 30px !important; letter-spacing: -0.02em !important; }
+    .page-title-subtitle { font-size: 16px !important; }
+    .mode-selector-card {
+      border-radius: 16px !important;
+      transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease !important;
+    }
+    .mode-selector-card:hover { transform: translateY(-3px) !important; box-shadow: 0 22px 40px -24px rgba(20,30,50,.5) !important; }
+    .dual-input-textarea { min-height: 300px !important; font-size: 16px !important; border-radius: 14px !important; }
+    .pdf-drop-zone { border-radius: 16px !important; }
+    .primary-btn { border-radius: 14px !important; transition: transform .12s ease, box-shadow .15s ease !important; }
+    .primary-btn:hover:not(:disabled) { transform: translateY(-2px) !important; box-shadow: 0 18px 32px -18px ${C.primary}99 !important; }
+  }
+
+  /* Layout 2 colonnes : barre laterale d'etapes + contenu (>=900px) */
+  @media (min-width: 900px) {
+    .app-main-container {
+      display: grid !important;
+      grid-template-columns: 270px minmax(0, 1fr) !important;
+      gap: 44px !important; align-items: start !important;
+      max-width: none !important;
+    }
+    .app-rail { position: sticky; top: 24px; }
+    .app-stage { min-width: 0; }
+    .step-bar-wrap { margin-bottom: 0 !important; padding: 24px 22px !important; }
+    .step-rail { display: flex !important; flex-direction: column !important; }
+    .step-bar-wrap .step-bar-mobile-hide { display: none !important; }
+    .main-card { padding: 48px 56px !important; }
+    .page-title-h2 { font-size: 32px !important; }
+  }
 `;
 
 const FONT_SERIF = "'Fraunces', Georgia, 'Times New Roman', serif";
@@ -1457,10 +1569,38 @@ function StepBar({ current }) {
   ];
   const pct = Math.round(((current - 1) / (steps.length - 1)) * 100);
   return (
-    <div style={{
+    <div className="step-bar-wrap" style={{
       background: C.bgCard, border: `1px solid ${C.border}`,
       borderRadius: "14px", padding: "20px 24px", marginBottom: "32px",
     }}>
+      {/* Rail vertical (barre laterale ordi, affiche >=900px via CSS) */}
+      <div className="step-rail" style={{ display: "none" }}>
+        <div style={{ fontSize: "12px", fontFamily: FONT_SANS, fontWeight: 700, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "18px" }}>Progression</div>
+        {steps.map((s, i) => {
+          const done = current > s.id;
+          const active = current === s.id;
+          const last = i === steps.length - 1;
+          return (
+            <div key={s.id} style={{ display: "flex", gap: "13px" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <div style={{
+                  width: "36px", height: "36px", borderRadius: "50%", flexShrink: 0,
+                  background: done ? C.success : active ? C.primary : C.bgSubtle,
+                  border: `2px solid ${done ? C.success : active ? C.primary : C.border}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "15px", fontWeight: 700, fontFamily: FONT_SANS,
+                  color: done || active ? "#FFF" : C.textMuted,
+                }}>{done ? "✓" : s.id}</div>
+                {!last && <div style={{ width: "2px", flex: 1, minHeight: "18px", background: done ? C.success : C.border, margin: "3px 0" }}/>}
+              </div>
+              <div style={{ paddingTop: "7px", paddingBottom: last ? "0" : "10px" }}>
+                <div style={{ fontSize: "10px", letterSpacing: "0.07em", textTransform: "uppercase", color: C.textMuted, fontFamily: FONT_SANS, fontWeight: 600 }}>Étape {s.id}</div>
+                <div style={{ fontSize: "14.5px", fontFamily: FONT_SANS, fontWeight: active ? 700 : 500, color: active ? C.primary : done ? C.success : C.textSecondary, lineHeight: 1.25 }}>{s.label}</div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
       {/* ── Version PC / TABLETTE (cachée sur mobile via CSS) ── */}
       <div className="step-bar-mobile-hide">
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "8px" }}>
@@ -3354,6 +3494,7 @@ export default function App() {
       if (session.analyse)                      setAnalyse(session.analyse);
       if (session.cvOpt)                        setCvOpt(session.cvOpt);
       if (session.cvEdite)                      setCvEdite(session.cvEdite);
+      if (session.cvOpt) setPaid(true); // dossier deja paye (reecriture faite) -> telechargement debloque
       if (session.cvEnAnglais)                  setCvEnAnglais(session.cvEnAnglais);
       if (typeof session.langueCV === "string") setLangueCV(session.langueCV);
       if (typeof session.formatUS === "boolean") setFormatUS(session.formatUS);
@@ -3468,13 +3609,20 @@ export default function App() {
       }
       setCvOpt(cv);
       setCvEdite(cv); // copie de travail pour l'édition contrôlée
-      // Nouveau score ATS du CV réécrit (si l'IA l'a fourni et qu'il progresse)
-      if (typeof cv.nouveauScore === "number") {
-        const ancien = analyse?.score ?? 0;
-        // On garde au minimum le score initial : l'optimisation ne fait jamais baisser
-        setScoreOptimise(Math.max(cv.nouveauScore, ancien));
+      // Nouveau score : on RECALCULE avec le MÊME algorithme que l'analyse initiale
+      // (analyserAlgo), appliqué cette fois au CV réécrit. Même méthode des deux côtés
+      // = progression honnête et fiable, et GRATUITE (aucun appel IA en plus).
+      const ancienScore = analyse?.score ?? 0;
+      let scoreReecrit = ancienScore;
+      try {
+        const reAnalyse = analyserAlgo(cvVersTexte(cv), offreContent);
+        if (typeof reAnalyse?.score === "number") scoreReecrit = reAnalyse.score;
+      } catch {
+        if (typeof cv.nouveauScore === "number") scoreReecrit = cv.nouveauScore;
       }
+      setScoreOptimise(Math.max(scoreReecrit, ancienScore));
       setCredits(depenseCredits(CREDITS.REWRITE));
+      setPaid(true); // le credit depense pour la reecriture debloque le dossier (telechargement + copie + lettre)
     } catch (err) {
       setCvOptError(err.message || "Erreur inattendue durant la réécriture.");
     }
@@ -3668,7 +3816,8 @@ export default function App() {
 
       <div className="app-main-container" style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>
 
-        <StepBar current={step}/>
+        <div className="app-rail"><StepBar current={step}/></div>
+        <div className="app-stage">
 
         {/* ÉTAPE 1 — Mon CV */}
         {step === 1 && <Card>
@@ -4230,6 +4379,7 @@ export default function App() {
         )}
 
         <Footer/>
+        </div>
       </div>
     </div>
   );

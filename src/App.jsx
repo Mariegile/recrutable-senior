@@ -197,6 +197,27 @@ function ajouterCredits(n) {
 }
 
 // ═════════════════════════════════════════════════════════════════
+//   CODES CADEAU (geste commercial / depannage) — usage unique
+// ═════════════════════════════════════════════════════════════════
+// code (MAJUSCULES) : nombre de credits offerts. Ajoute/modifie librement.
+const CODES_CADEAU = {
+  "MERCI100": 100,
+};
+const USED_CODES_KEY = "recrutable_codes_utilises";
+function utiliserCodeCadeau(rawCode) {
+  try {
+    const code = String(rawCode || "").trim().toUpperCase();
+    if (!code || !(code in CODES_CADEAU)) return { ok: false, raison: "inconnu" };
+    const used = JSON.parse(localStorage.getItem(USED_CODES_KEY) || "[]");
+    if (used.includes(code)) return { ok: false, raison: "deja" };
+    used.push(code);
+    localStorage.setItem(USED_CODES_KEY, JSON.stringify(used));
+    const total = ajouterCredits(CODES_CADEAU[code]);
+    return { ok: true, credits: CODES_CADEAU[code], total };
+  } catch { return { ok: false, raison: "erreur" }; }
+}
+
+// ═════════════════════════════════════════════════════════════════
 //   SAUVEGARDE DE SESSION (localStorage) — Tout préserver
 // ═════════════════════════════════════════════════════════════════
 // Sauvegarde automatique de la session en cours pour reprendre exactement
@@ -3198,7 +3219,9 @@ function Footer() {
 }
 
 // ── Modal des offres : ouverte depuis le badge des crédits ─────────
-function OffresModal({ open, onClose, credits }) {
+function OffresModal({ open, onClose, credits, onRedeem }) {
+  const [codeInput, setCodeInput] = useState("");
+  const [codeMsg, setCodeMsg] = useState(null);
 
   // Empêche le scroll du body quand le modal est ouvert
   useEffect(() => {
@@ -3399,6 +3422,15 @@ function OffresModal({ open, onClose, credits }) {
           <br/>
           Un problème ? Écrivez-nous : <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: C.primary, fontWeight: 600 }}>{SUPPORT_EMAIL}</a>
         </div>
+
+        <div style={{ marginTop: "16px", borderTop: `1px solid ${C.border}`, paddingTop: "16px" }}>
+          <div style={{ fontSize: "14px", fontWeight: 600, color: C.text, marginBottom: "8px", textAlign: "center" }}>Vous avez un code cadeau ?</div>
+          <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
+            <input value={codeInput} onChange={(e) => setCodeInput(e.target.value)} placeholder="Entrez votre code" style={{ flex: 1, minWidth: "180px", padding: "10px 14px", border: `1.5px solid ${C.inputBorder}`, borderRadius: "10px", fontSize: "15px", fontFamily: FONT_SANS, textTransform: "uppercase" }} />
+            <button onClick={() => { const r = onRedeem(codeInput); if (r.ok) { setCodeMsg({ ok: true, text: r.credits + " credits ajoutes ! Vous avez maintenant " + r.total + " credits." }); setCodeInput(""); } else if (r.raison === "deja") { setCodeMsg({ ok: false, text: "Ce code a deja ete utilise." }); } else { setCodeMsg({ ok: false, text: "Code invalide." }); } }} style={{ padding: "10px 18px", background: C.primary, color: "#FFF", border: "none", borderRadius: "10px", fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>Valider</button>
+          </div>
+          {codeMsg && (<div style={{ marginTop: "8px", fontSize: "13px", textAlign: "center", fontWeight: 600, color: codeMsg.ok ? C.success : C.error }}>{codeMsg.text}</div>)}
+        </div>
       </div>
     </div>
   );
@@ -3476,6 +3508,19 @@ export default function App() {
         setPaid(true);
         setPaymentSuccess(formule);
       }
+    }
+  }, []);
+
+  // ── Au chargement : code cadeau passe en lien (?code=XXX) ─────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (!code) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    const r = utiliserCodeCadeau(code);
+    if (r.ok) {
+      setCredits(r.total);
+      setTimeout(() => alert("Code cadeau valide ! " + r.credits + " credits ont ete ajoutes a votre compte."), 300);
     }
   }, []);
 
@@ -3812,6 +3857,7 @@ export default function App() {
         open={showOffres}
         onClose={() => setShowOffres(false)}
         credits={credits}
+        onRedeem={(code) => { const r = utiliserCodeCadeau(code); if (r.ok) setCredits(r.total); return r; }}
       />
 
       <div className="app-main-container" style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>

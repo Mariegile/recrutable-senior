@@ -201,7 +201,8 @@ function ajouterCredits(n) {
 // ═════════════════════════════════════════════════════════════════
 // code (MAJUSCULES) : nombre de credits offerts. Ajoute/modifie librement.
 const CODES_CADEAU = {
-  "MERCI100": 100,
+  // Aucun code actif (MERCI100 annule le 18/06/2026, cliente remboursee).
+  // Pour (re)activer un code, ajoute une ligne, ex : "MONCODE": 100,
 };
 const USED_CODES_KEY = "recrutable_codes_utilises";
 function utiliserCodeCadeau(rawCode) {

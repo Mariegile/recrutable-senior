@@ -1,4 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+// ── Connexion Supabase (comptes + credits cote serveur) ─────────────
+const SUPABASE_URL = "https://grspvuktagvdyjdfowyc.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_oeh8VOrL-eoc_lcEOmgYtg_Pgw7pAJi";
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // ═══════════════════════════════════════════════════════════════════
 //   RECRUTABLE — ÉDITION SENIORS (45+ ans)
@@ -1511,7 +1517,7 @@ function PaymentSuccessBanner({ formule, credits, onClose }) {
   );
 }
 
-function Header({ credits, onCreditsClick }) {
+function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
   return (
     <div className="app-header" style={{
       background: C.bgCard,
@@ -1537,7 +1543,17 @@ function Header({ credits, onCreditsClick }) {
             Votre CV passe enfin les filtres des recruteurs
           </p>
         </div>
-        <CreditBadge credits={credits} onClick={onCreditsClick}/>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {session ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: FONT_SANS, maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.user?.email}</span>
+              <button onClick={onLogout} style={{ padding: "8px 12px", background: C.bgSubtle, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "13px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>Deconnexion</button>
+            </div>
+          ) : (
+            <button onClick={onLogin} style={{ padding: "9px 16px", background: C.primary, color: "#FFF", border: "none", borderRadius: "9px", fontSize: "14px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>Se connecter</button>
+          )}
+          <CreditBadge credits={credits} onClick={onCreditsClick}/>
+        </div>
       </div>
     </div>
   );
@@ -3220,6 +3236,62 @@ function Footer() {
 }
 
 // ── Modal des offres : ouverte depuis le badge des crédits ─────────
+function AuthModal({ open, onClose }) {
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (open) {
+      const o = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = o; };
+    }
+  }, [open]);
+  if (!open) return null;
+  const submit = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      if (mode === "signup") {
+        const { error } = await supabase.auth.signUp({ email: email.trim(), password });
+        if (error) throw error;
+        setMsg({ ok: true, text: "Compte cree ! Verifiez votre boite mail pour confirmer votre adresse, puis connectez-vous." });
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (error) throw error;
+        onClose();
+      }
+    } catch (e) {
+      setMsg({ ok: false, text: (e && e.message === "Invalid login credentials") ? "E-mail ou mot de passe incorrect." : ((e && e.message) || "Une erreur est survenue.") });
+    }
+    setBusy(false);
+  };
+  const googleLogin = async () => {
+    setMsg(null);
+    const { error } = await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+    if (error) setMsg({ ok: false, text: "Connexion Google indisponible pour le moment." });
+  };
+  return (
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(20,22,18,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: C.bgCard, borderRadius: "18px", padding: "32px 28px", width: "100%", maxWidth: "420px", boxShadow: "0 30px 60px -20px rgba(0,0,0,0.4)", fontFamily: FONT_SANS }}>
+        <h2 style={{ margin: "0 0 6px", fontFamily: FONT_SERIF, fontSize: "24px", color: C.primary }}>{mode === "signup" ? "Creer un compte" : "Se connecter"}</h2>
+        <p style={{ margin: "0 0 20px", fontSize: "14px", color: C.textSecondary }}>Vos credits sont lies a votre compte.</p>
+        <button onClick={googleLogin} style={{ width: "100%", padding: "12px", background: "#FFF", color: C.text, border: `1.5px solid ${C.border}`, borderRadius: "10px", fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer", marginBottom: "14px" }}>Continuer avec Google</button>
+        <div style={{ textAlign: "center", fontSize: "12px", color: C.textMuted, margin: "0 0 14px" }}>- ou -</div>
+        <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Votre e-mail" style={{ width: "100%", padding: "12px 14px", border: `1.5px solid ${C.inputBorder}`, borderRadius: "10px", fontSize: "15px", fontFamily: FONT_SANS, marginBottom: "10px", boxSizing: "border-box" }} />
+        <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Mot de passe" style={{ width: "100%", padding: "12px 14px", border: `1.5px solid ${C.inputBorder}`, borderRadius: "10px", fontSize: "15px", fontFamily: FONT_SANS, marginBottom: "14px", boxSizing: "border-box" }} />
+        <button onClick={submit} disabled={busy} style={{ width: "100%", padding: "13px", background: C.primary, color: "#FFF", border: "none", borderRadius: "10px", fontSize: "16px", fontWeight: 700, fontFamily: FONT_SANS, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? "..." : (mode === "signup" ? "Creer mon compte" : "Se connecter")}</button>
+        {msg && (<div style={{ marginTop: "12px", fontSize: "13px", textAlign: "center", fontWeight: 600, color: msg.ok ? C.success : C.error }}>{msg.text}</div>)}
+        <div style={{ marginTop: "16px", textAlign: "center", fontSize: "14px", color: C.textSecondary }}>
+          {mode === "signup" ? "Deja un compte ?" : "Pas encore de compte ?"}{" "}
+          <button onClick={() => { setMode(mode === "signup" ? "login" : "signup"); setMsg(null); }} style={{ background: "none", border: "none", color: C.primary, fontWeight: 700, cursor: "pointer", fontSize: "14px", fontFamily: FONT_SANS }}>{mode === "signup" ? "Se connecter" : "Creer un compte"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OffresModal({ open, onClose, credits, onRedeem }) {
   const [codeInput, setCodeInput] = useState("");
   const [codeMsg, setCodeMsg] = useState(null);
@@ -3523,6 +3595,15 @@ export default function App() {
       setCredits(r.total);
       setTimeout(() => alert("Code cadeau valide ! " + r.credits + " credits ont ete ajoutes a votre compte."), 300);
     }
+  }, []);
+
+  // ── Connexion / session (Supabase) ───────────────────────────────
+  const [session, setSession] = useState(null);
+  const [showAuth, setShowAuth] = useState(false);
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   // ── Au chargement : restaurer la session précédente si elle existe ──
@@ -3844,7 +3925,8 @@ export default function App() {
       <style>{GLOBAL_STYLES}</style>
       <PaperBG/>
 
-      <Header credits={credits} onCreditsClick={() => setShowOffres(true)}/>
+      <Header credits={credits} onCreditsClick={() => setShowOffres(true)} session={session} onLogin={() => setShowAuth(true)} onLogout={() => supabase.auth.signOut()}/>
+      <AuthModal open={showAuth} onClose={() => setShowAuth(false)}/>
 
       {paymentSuccess && (
         <PaymentSuccessBanner

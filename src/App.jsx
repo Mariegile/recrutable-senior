@@ -3545,7 +3545,7 @@ export default function App() {
   const [secteur, setSecteur]               = useState("default");
   const [paid, setPaid]                     = useState(false);
   const [showOffres, setShowOffres]         = useState(false);
-  const [credits, setCredits]               = useState(getCredits);
+  const [credits, setCredits]               = useState(0);
   const [pivots, setPivots]                 = useState(null);
   const [pivotLoading, setPivotLoading]     = useState(false);
   const [pivotError, setPivotError]         = useState("");
@@ -3574,13 +3574,9 @@ export default function App() {
   useEffect(() => {
     const formule = detectRetourStripe();
     if (formule) {
-      const n = RECHARGE_CREDITS[formule] ?? 0;
-      if (n > 0) {
-        const nouveauTotal = ajouterCredits(n);
-        setCredits(nouveauTotal);
-        setPaid(true);
-        setPaymentSuccess(formule);
-      }
+      setPaymentSuccess(formule);
+      // Credits ajoutes cote serveur par le webhook Stripe ; on rafraichit depuis la base.
+      supabase.auth.getSession().then(({ data }) => chargerCredits(data.session));
     }
   }, []);
 
@@ -3600,9 +3596,15 @@ export default function App() {
   // ── Connexion / session (Supabase) ───────────────────────────────
   const [session, setSession] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
+  // Charge les credits du compte depuis la base (0 si deconnecte)
+  const chargerCredits = async (s) => {
+    if (!s) { setCredits(0); return; }
+    const { data } = await supabase.from("profils").select("credits").eq("id", s.user.id).single();
+    if (data) setCredits(data.credits);
+  };
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => setSession(s));
+    supabase.auth.getSession().then(({ data }) => { setSession(data.session); chargerCredits(data.session); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => { setSession(s); chargerCredits(s); });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -3698,6 +3700,11 @@ export default function App() {
 
   const doCvOpt = async () => {
     if (loading || !canCvOpt) return;
+    if (!session) {
+      setShowAuth(true);
+      setCvOptError("Connectez-vous ou créez un compte pour réécrire votre CV.");
+      return;
+    }
     if (credits < CREDITS.REWRITE) {
       setCvOptError(`Il vous faut 1 action IA pour la réécriture. Achetez la recharge à 2,99 € (3 dossiers complets).`);
       return;
@@ -3748,7 +3755,8 @@ export default function App() {
         if (typeof cv.nouveauScore === "number") scoreReecrit = cv.nouveauScore;
       }
       setScoreOptimise(Math.max(scoreReecrit, ancienScore));
-      setCredits(depenseCredits(CREDITS.REWRITE));
+      const { data: soldeApres, error: errDep } = await supabase.rpc("depenser_credit", { montant: CREDITS.REWRITE });
+      if (!errDep && typeof soldeApres === "number") setCredits(soldeApres);
       setPaid(true); // le credit depense pour la reecriture debloque le dossier (telechargement + copie + lettre)
     } catch (err) {
       setCvOptError(err.message || "Erreur inattendue durant la réécriture.");
@@ -3880,8 +3888,7 @@ export default function App() {
 
   // ── Confirmation de paiement : crédite selon la formule choisie ──
   const handlePaid = (formule) => {
-    const n = RECHARGE_CREDITS[formule] ?? 0;
-    if (n > 0) setCredits(ajouterCredits(n));
+    chargerCredits(session); // les credits sont ajoutes cote serveur (webhook)
     setPaid(true);
   };
 

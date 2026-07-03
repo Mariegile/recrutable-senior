@@ -1257,6 +1257,30 @@ const GLOBAL_STYLES = `
     .gauge-fill { animation: none !important; stroke-dashoffset: var(--target-offset) !important; }
   }
 
+  /* ── Accueil / Hero (première visite uniquement) ────────────────── */
+  .hero-wrap { margin-bottom: 36px; animation: fadeIn 0.5s ease; }
+  .hero-grid { display: grid; grid-template-columns: 1fr; gap: 28px; align-items: center; }
+  .hero-visual { display: none; }
+  .hero-title { font-size: 32px; }
+  .hero-steps { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 30px; }
+  @media (min-width: 640px) {
+    .hero-title { font-size: 42px; }
+    .hero-steps { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  }
+  @media (min-width: 900px) {
+    .hero-grid { grid-template-columns: 1.15fr 0.85fr; gap: 44px; }
+    .hero-visual { display: flex; justify-content: center; }
+    .hero-title { font-size: 46px; }
+  }
+  .hero-cta:hover { transform: translateY(-2px); box-shadow: 0 14px 30px -10px rgba(168,93,44,0.6); }
+  .hero-copy { text-align: center; }
+  .hero-copy .hero-para { margin-left: auto; margin-right: auto; }
+  @media (min-width: 900px) {
+    .hero-copy { text-align: left; }
+    .hero-copy .hero-para { margin-left: 0; margin-right: 0; }
+  }
+  .hero-steps { text-align: left; }
+
   /* Focus rings accessibles */
   button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visible {
     outline: 3px solid ${C.primary};
@@ -1532,6 +1556,133 @@ function PaymentSuccessBanner({ formule, credits, onClose }) {
       >
         ✕
       </button>
+    </div>
+  );
+}
+
+// ── Accueil : bloc de bienvenue, affiché uniquement à la première visite ──
+// Objectif : donner envie dès l'arrivée (promesse, preuve visuelle, 3 étapes)
+// avant de présenter le formulaire de l'étape 1.
+function HeroAccueil({ onStart }) {
+  const gaugeR = 40;
+  const gaugeC = 2 * Math.PI * gaugeR;
+  const gaugeOffset = gaugeC * (1 - 0.88); // jauge d'illustration : 88 %
+  return (
+    <div className="hero-wrap" style={{ fontFamily: FONT_SANS }}>
+      <div className="hero-grid">
+        {/* Colonne texte : promesse + CTA */}
+        <div className="hero-copy">
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: "8px",
+            background: C.accentSoft, border: `1px solid ${C.accent}40`,
+            color: C.accentDark, borderRadius: "999px", padding: "7px 14px",
+            fontSize: "13.5px", fontWeight: 700, letterSpacing: "0.02em",
+            marginBottom: "18px",
+          }}>
+            ✦ Conçu pour les profils expérimentés — 45 ans et +
+          </div>
+          <h2 className="hero-title" style={{
+            margin: 0, fontFamily: FONT_SERIF, fontWeight: 700,
+            color: C.text, letterSpacing: "-0.02em", lineHeight: 1.12,
+          }}>
+            Votre expérience mérite d'être <span style={{ color: C.accent }}>vue</span>.
+          </h2>
+          <p className="hero-para" style={{
+            margin: "18px 0 26px", fontSize: "17.5px", lineHeight: 1.65,
+            color: C.textSecondary, maxWidth: "560px",
+          }}>
+            Avant d'arriver sous les yeux d'un recruteur, votre CV est trié par un logiciel.
+            <strong style={{ color: C.text }}> La majorité des candidatures sont écartées à cette
+            étape, avant même d'être lues.</strong> Recrutable mesure gratuitement votre
+            compatibilité avec l'offre visée, puis réécrit votre CV et votre lettre pour passer
+            les filtres — en valorisant votre expérience, jamais votre âge.
+          </p>
+          <button
+            onClick={onStart}
+            className="hero-cta"
+            style={{
+              minHeight: "62px", padding: "18px 32px", borderRadius: "14px", border: "none",
+              background: `linear-gradient(135deg, ${C.accent}, ${C.accentDark})`, color: "#FFF",
+              fontSize: "18px", fontWeight: 700, fontFamily: FONT_SANS, cursor: "pointer",
+              boxShadow: "0 10px 26px -10px rgba(168,93,44,0.55)",
+              display: "inline-flex", alignItems: "center", gap: "10px",
+              transition: "transform 0.12s ease, box-shadow 0.15s ease",
+            }}
+          >
+            {"Analyser mon CV gratuitement ↓"}
+          </button>
+          <div style={{ marginTop: "14px", fontSize: "14px", color: C.textMuted, fontWeight: 500 }}>
+            ✓ Gratuit et illimité&nbsp;&nbsp;·&nbsp;&nbsp;✓ Sans carte bancaire&nbsp;&nbsp;·&nbsp;&nbsp;✓ Résultat en 2 minutes
+          </div>
+        </div>
+
+        {/* Colonne visuelle : CV stylisé + jauge de compatibilité (≥900px) */}
+        <div className="hero-visual">
+          <svg width="300" height="300" viewBox="0 0 300 300" aria-hidden="true"
+               style={{ filter: "drop-shadow(0 24px 32px rgba(27,58,92,0.18))" }}>
+            {/* Feuille A4 légèrement inclinée */}
+            <g transform="rotate(-4 150 150)">
+              <rect x="52" y="22" width="176" height="244" rx="7" fill="#FFFFFF" stroke={C.border}/>
+              <rect x="52" y="22" width="176" height="42" rx="7" fill={C.primary}/>
+              <rect x="52" y="56" width="176" height="8" fill={C.primary}/>
+              <rect x="70" y="36" width="86" height="9" rx="4.5" fill="#FFFFFF" opacity="0.95"/>
+              <rect x="70" y="50" width="58" height="6" rx="3" fill="#FFFFFF" opacity="0.55"/>
+              <rect x="70" y="84" width="52" height="7" rx="3.5" fill={C.accent}/>
+              <rect x="70" y="100" width="140" height="6" rx="3" fill={C.border}/>
+              <rect x="70" y="112" width="126" height="6" rx="3" fill={C.border}/>
+              <rect x="70" y="124" width="134" height="6" rx="3" fill={C.border}/>
+              <rect x="70" y="146" width="64" height="7" rx="3.5" fill={C.accent}/>
+              <rect x="70" y="162" width="140" height="6" rx="3" fill={C.border}/>
+              <rect x="70" y="174" width="118" height="6" rx="3" fill={C.border}/>
+              <rect x="70" y="196" width="46" height="14" rx="7" fill={C.successSoft} stroke={`${C.success}55`}/>
+              <rect x="122" y="196" width="56" height="14" rx="7" fill={C.successSoft} stroke={`${C.success}55`}/>
+              <rect x="70" y="218" width="112" height="6" rx="3" fill={C.border}/>
+              <rect x="70" y="230" width="96" height="6" rx="3" fill={C.border}/>
+            </g>
+            {/* Jauge de compatibilité, en médaillon */}
+            <g transform="translate(216 212)">
+              <circle r="54" fill="#FFFFFF" stroke={C.border}/>
+              <circle r={gaugeR} fill="none" stroke={`${C.success}22`} strokeWidth="8"/>
+              <circle
+                className="gauge-fill"
+                r={gaugeR} fill="none" stroke={C.success} strokeWidth="8" strokeLinecap="round"
+                strokeDasharray={gaugeC} strokeDashoffset={gaugeC} transform="rotate(-90)"
+                style={{
+                  "--target-offset": String(gaugeOffset),
+                  animation: "fillGauge 1.6s cubic-bezier(0.25, 0.8, 0.3, 1) 0.4s forwards",
+                }}
+              />
+              <text y="0" textAnchor="middle" fontSize="26" fontWeight="700"
+                    fill={C.success} fontFamily="Fraunces, Georgia, serif">88%</text>
+              <text y="18" textAnchor="middle" fontSize="9" fontWeight="700"
+                    fill={C.textMuted} letterSpacing="1.2">COMPATIBLE</text>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      {/* Les 3 étapes, en cartes */}
+      <div className="hero-steps">
+        {[
+          { n: 1, icone: "📋", titre: "Collez votre CV", texte: "Ou envoyez le PDF — même imparfait, c'est notre travail de l'améliorer." },
+          { n: 2, icone: "🔍", titre: "Découvrez votre score", texte: "Analyse gratuite et illimitée face à l'offre d'emploi visée." },
+          { n: 3, icone: "⬇️", titre: "Téléchargez votre dossier", texte: "CV optimisé et lettre de motivation, prêts à envoyer." },
+        ].map(s => (
+          <div key={s.n} className="glass-panel" style={{ borderRadius: "14px", padding: "18px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+              <span style={{
+                width: "30px", height: "30px", borderRadius: "50%", background: C.primary,
+                color: "#FFF", display: "inline-flex", alignItems: "center", justifyContent: "center",
+                fontSize: "14px", fontWeight: 700, flexShrink: 0,
+              }}>{s.n}</span>
+              <span style={{ fontSize: "16.5px", fontWeight: 700, color: C.text, fontFamily: FONT_SERIF }}>
+                <span aria-hidden="true">{s.icone}</span> {s.titre}
+              </span>
+            </div>
+            <div style={{ fontSize: "14.5px", color: C.textSecondary, lineHeight: 1.55 }}>{s.texte}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -3431,6 +3582,8 @@ export default function App() {
   const [pivotError, setPivotError]         = useState("");
   const [showPivot, setShowPivot]           = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(null);
+  // Hero d'accueil : visible uniquement à la première visite (pas de session sauvegardée)
+  const [montrerHero, setMontrerHero] = useState(() => !chargerSession());
 
   useEffect(() => { loadPdfJs().catch(() => {}); }, []);
 
@@ -3439,6 +3592,11 @@ export default function App() {
   // l'utilisateur au milieu de la carte suivante — très désorientant.
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step]);
+
+  // Une fois le parcours entamé, le hero d'accueil ne revient plus
+  useEffect(() => {
+    if (step > 1) setMontrerHero(false);
   }, [step]);
 
   // ── Bloquer Google Translate (cause documentée de crash dans React) ──
@@ -3841,6 +3999,13 @@ export default function App() {
 
         <div className="app-rail"><StepBar current={step}/></div>
         <div className="app-stage">
+
+        {/* HERO D'ACCUEIL — première visite uniquement */}
+        {step === 1 && montrerHero && (
+          <HeroAccueil onStart={() => {
+            document.querySelector(".main-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}/>
+        )}
 
         {/* ÉTAPE 1 — Mon CV */}
         {step === 1 && <Card>

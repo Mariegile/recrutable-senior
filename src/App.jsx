@@ -1281,6 +1281,15 @@ const GLOBAL_STYLES = `
   }
   .hero-steps { text-align: left; }
 
+  /* Sur téléphone : le hero intégré cède la place à l'écran de bienvenue plein
+     écran (HeroOverlayMobile), fermable d'une croix. Tablette/PC : hero intégré. */
+  .hero-wrap { display: none; }
+  .hero-overlay { display: flex; }
+  @media (min-width: 640px) {
+    .hero-wrap { display: block; }
+    .hero-overlay { display: none !important; }
+  }
+
   /* Mode accueil (première visite) : pas de rail de progression à gauche,
      le hero occupe toute la largeur — sinon gros vide et contenu décalé à droite */
   @media (min-width: 900px) {
@@ -1571,6 +1580,113 @@ function PaymentSuccessBanner({ formule, credits, onClose }) {
   );
 }
 
+// ── Accueil : les 3 étapes du parcours (partagées hero PC / overlay mobile) ──
+const HERO_ETAPES = [
+  { n: 1, icone: "📋", titre: "Collez votre CV", texte: "Ou envoyez le PDF — même imparfait, c'est notre travail de l'améliorer." },
+  { n: 2, icone: "🔍", titre: "Découvrez votre score", texte: "Analyse gratuite et illimitée face à l'offre d'emploi visée." },
+  { n: 3, icone: "⬇️", titre: "Téléchargez votre dossier", texte: "CV optimisé et lettre de motivation, prêts à envoyer." },
+];
+
+function HeroEtapeCard({ etape }) {
+  return (
+    <div className="glass-panel" style={{ borderRadius: "14px", padding: "18px 20px", textAlign: "left" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
+        <span style={{
+          width: "30px", height: "30px", borderRadius: "50%", background: C.primary,
+          color: "#FFF", display: "inline-flex", alignItems: "center", justifyContent: "center",
+          fontSize: "14px", fontWeight: 700, flexShrink: 0,
+        }}>{etape.n}</span>
+        <span style={{ fontSize: "16.5px", fontWeight: 700, color: C.text, fontFamily: FONT_SERIF }}>
+          <span aria-hidden="true">{etape.icone}</span> {etape.titre}
+        </span>
+      </div>
+      <div style={{ fontSize: "14.5px", color: C.textSecondary, lineHeight: 1.55 }}>{etape.texte}</div>
+    </div>
+  );
+}
+
+// ── Accueil mobile : écran de bienvenue plein écran, fermable d'une croix ──
+function HeroOverlayMobile({ onClose }) {
+  return (
+    <div className="hero-overlay" style={{
+      position: "fixed", inset: 0, zIndex: 5000,
+      background: `linear-gradient(180deg, #FDFBF7 0%, ${C.bg} 100%)`,
+      overflowY: "auto", overscrollBehavior: "contain",
+      flexDirection: "column",
+      padding: "20px 22px 32px",
+      fontFamily: FONT_SANS,
+      animation: "fadeIn 0.3s ease",
+    }}>
+      <div style={{ width: "100%", maxWidth: "480px", margin: "0 auto" }}>
+        {/* Barre du haut : marque + croix pour entrer dans l'application */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "22px" }}>
+          <span style={{ fontFamily: FONT_SERIF, fontWeight: 700, fontSize: "22px", color: C.primary }}>
+            Recrutable
+          </span>
+          <button
+            onClick={onClose}
+            aria-label="Fermer l'écran de bienvenue et commencer"
+            style={{
+              width: "44px", height: "44px", borderRadius: "50%",
+              border: `1px solid ${C.border}`, background: "#FFF",
+              fontSize: "20px", fontWeight: 700, color: C.textSecondary,
+              cursor: "pointer", display: "flex", alignItems: "center",
+              justifyContent: "center", flexShrink: 0,
+              boxShadow: "0 2px 8px rgba(26,22,18,0.08)",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ textAlign: "center" }}>
+          <div style={{
+            display: "inline-flex", alignItems: "center", gap: "8px",
+            background: C.accentSoft, border: `1px solid ${C.accent}40`,
+            color: C.accentDark, borderRadius: "999px", padding: "6px 14px",
+            fontSize: "13px", fontWeight: 700, marginBottom: "16px",
+          }}>
+            ✦ Optimisé pour chaque offre d'emploi
+          </div>
+          <h2 style={{
+            margin: 0, fontFamily: FONT_SERIF, fontWeight: 700, fontSize: "33px",
+            color: C.text, letterSpacing: "-0.02em", lineHeight: 1.15,
+          }}>
+            Votre expérience mérite d'être <span style={{ color: C.accent }}>vue</span>.
+          </h2>
+          <p style={{ margin: "14px 0 22px", fontSize: "16px", lineHeight: 1.6, color: C.textSecondary }}>
+            Avant d'atteindre un recruteur, votre CV est trié par un logiciel.
+            Recrutable l'analyse gratuitement face à l'offre visée, puis le réécrit
+            pour passer les filtres.
+          </p>
+        </div>
+
+        {/* Les 3 étapes */}
+        <div style={{ display: "grid", gap: "12px", marginBottom: "24px" }}>
+          {HERO_ETAPES.map(s => <HeroEtapeCard key={s.n} etape={s}/>)}
+        </div>
+
+        <button
+          onClick={onClose}
+          className="hero-cta"
+          style={{
+            width: "100%", minHeight: "60px", padding: "16px 24px",
+            borderRadius: "14px", border: "none",
+            background: `linear-gradient(135deg, ${C.accent}, ${C.accentDark})`, color: "#FFF",
+            fontSize: "17px", fontWeight: 700, fontFamily: FONT_SANS, cursor: "pointer",
+            boxShadow: "0 10px 26px -10px rgba(168,93,44,0.55)",
+          }}
+        >
+          Commencer mon analyse gratuite
+        </button>
+        <div style={{ marginTop: "12px", textAlign: "center", fontSize: "13.5px", color: C.textMuted, fontWeight: 500 }}>
+          ✓ Gratuit et illimité · ✓ Sans carte bancaire
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Accueil : bloc de bienvenue, affiché uniquement à la première visite ──
 // Objectif : donner envie dès l'arrivée (promesse, preuve visuelle, 3 étapes)
 // avant de présenter le formulaire de l'étape 1.
@@ -1674,25 +1790,7 @@ function HeroAccueil({ onStart }) {
 
       {/* Les 3 étapes, en cartes */}
       <div className="hero-steps">
-        {[
-          { n: 1, icone: "📋", titre: "Collez votre CV", texte: "Ou envoyez le PDF — même imparfait, c'est notre travail de l'améliorer." },
-          { n: 2, icone: "🔍", titre: "Découvrez votre score", texte: "Analyse gratuite et illimitée face à l'offre d'emploi visée." },
-          { n: 3, icone: "⬇️", titre: "Téléchargez votre dossier", texte: "CV optimisé et lettre de motivation, prêts à envoyer." },
-        ].map(s => (
-          <div key={s.n} className="glass-panel" style={{ borderRadius: "14px", padding: "18px 20px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
-              <span style={{
-                width: "30px", height: "30px", borderRadius: "50%", background: C.primary,
-                color: "#FFF", display: "inline-flex", alignItems: "center", justifyContent: "center",
-                fontSize: "14px", fontWeight: 700, flexShrink: 0,
-              }}>{s.n}</span>
-              <span style={{ fontSize: "16.5px", fontWeight: 700, color: C.text, fontFamily: FONT_SERIF }}>
-                <span aria-hidden="true">{s.icone}</span> {s.titre}
-              </span>
-            </div>
-            <div style={{ fontSize: "14.5px", color: C.textSecondary, lineHeight: 1.55 }}>{s.texte}</div>
-          </div>
-        ))}
+        {HERO_ETAPES.map(s => <HeroEtapeCard key={s.n} etape={s}/>)}
       </div>
     </div>
   );
@@ -3593,8 +3691,13 @@ export default function App() {
   const [pivotError, setPivotError]         = useState("");
   const [showPivot, setShowPivot]           = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(null);
-  // Hero d'accueil : visible uniquement à la première visite (pas de session sauvegardée)
-  const [montrerHero, setMontrerHero] = useState(() => !chargerSession());
+  // Hero d'accueil : visible tant que le parcours n'a pas vraiment commencé
+  // (aucune session, ou session restée à l'étape 1 sans analyse ni réécriture).
+  // Un simple texte collé sans analyse ne suffit pas à le masquer.
+  const [montrerHero, setMontrerHero] = useState(() => {
+    const s = chargerSession();
+    return !s || ((s.step ?? 1) === 1 && !s.analyse && !s.cvOpt);
+  });
 
   useEffect(() => { loadPdfJs().catch(() => {}); }, []);
 
@@ -3904,6 +4007,7 @@ export default function App() {
     setSecteur("default"); setLoadingProgress(0);
     setPivots(null); setPivotError(""); setShowPivot(false);
     effacerSession(); // on efface aussi la session sauvegardée
+    setMontrerHero(true); // repartir de zéro = retrouver l'écran d'accueil
   };
 
   // ── Édition contrôlée ──────────────────────────────────────────
@@ -4011,11 +4115,16 @@ export default function App() {
         <div className="app-rail"><StepBar current={step}/></div>
         <div className="app-stage">
 
-        {/* HERO D'ACCUEIL — première visite uniquement */}
+        {/* HERO D'ACCUEIL — première visite uniquement.
+            Tablette/PC : bloc intégré au-dessus du formulaire.
+            Téléphone : écran de bienvenue plein écran, fermable d'une croix. */}
         {step === 1 && montrerHero && (
-          <HeroAccueil onStart={() => {
-            document.querySelector(".main-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }}/>
+          <>
+            <HeroAccueil onStart={() => {
+              document.querySelector(".main-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}/>
+            <HeroOverlayMobile onClose={() => setMontrerHero(false)}/>
+          </>
         )}
 
         {/* ÉTAPE 1 — Mon CV */}

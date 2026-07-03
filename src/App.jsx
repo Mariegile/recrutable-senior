@@ -1281,6 +1281,17 @@ const GLOBAL_STYLES = `
   }
   .hero-steps { text-align: left; }
 
+  /* Mode accueil (première visite) : pas de rail de progression à gauche,
+     le hero occupe toute la largeur — sinon gros vide et contenu décalé à droite */
+  @media (min-width: 900px) {
+    .app-main-container.accueil-mode {
+      display: block !important;
+      max-width: 1080px !important;
+      margin: 0 auto !important;
+    }
+    .accueil-mode .app-rail { display: none !important; }
+  }
+
   /* Focus rings accessibles */
   button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visible {
     outline: 3px solid ${C.primary};
@@ -1579,7 +1590,7 @@ function HeroAccueil({ onStart }) {
             fontSize: "13.5px", fontWeight: 700, letterSpacing: "0.02em",
             marginBottom: "18px",
           }}>
-            ✦ Conçu pour les profils expérimentés — 45 ans et +
+            ✦ CV, lettre et score de compatibilité — optimisés pour chaque offre
           </div>
           <h2 className="hero-title" style={{
             margin: 0, fontFamily: FONT_SERIF, fontWeight: 700,
@@ -1595,7 +1606,7 @@ function HeroAccueil({ onStart }) {
             <strong style={{ color: C.text }}> La majorité des candidatures sont écartées à cette
             étape, avant même d'être lues.</strong> Recrutable mesure gratuitement votre
             compatibilité avec l'offre visée, puis réécrit votre CV et votre lettre pour passer
-            les filtres — en valorisant votre expérience, jamais votre âge.
+            les filtres — en mettant en valeur ce que vous savez vraiment faire.
           </p>
           <button
             onClick={onStart}
@@ -3259,7 +3270,7 @@ function Footer() {
           Vos données restent confidentielles · Paiement sécurisé Stripe · Conforme RGPD
         </p>
         <p style={{ margin: 0, fontSize: "13px" }}>
-          © {new Date().getFullYear()} Recrutable · Le service qui aide les profils expérimentés à retrouver un emploi
+          © {new Date().getFullYear()} Recrutable · Le service qui aide les candidats à décrocher plus d'entretiens
         </p>
       </div>
     </div>
@@ -3995,7 +4006,7 @@ export default function App() {
         onRedeem={(code) => { const r = utiliserCodeCadeau(code); if (r.ok) setCredits(r.total); return r; }}
       />
 
-      <div className="app-main-container" style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>
+      <div className={`app-main-container${step === 1 && montrerHero ? " accueil-mode" : ""}`} style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>
 
         <div className="app-rail"><StepBar current={step}/></div>
         <div className="app-stage">

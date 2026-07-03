@@ -84,6 +84,7 @@ const C = {
   successSoft:  "#E6F0EB",
   warning:      "#B8851C",
   warningSoft:  "#FAF1DC",
+  warningText:  "#7A5A14", // le #B8851C échoue au contraste AA (4,5:1) en petit texte
   error:        "#A03020",
   errorSoft:    "#F4E2DE",
 
@@ -1240,6 +1241,21 @@ const GLOBAL_STYLES = `
   @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  @keyframes fillGauge { to { stroke-dashoffset: var(--target-offset); } }
+
+  /* Verre dépoli — accent ponctuel (score, encarts), pas un style global */
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    box-shadow: 0 8px 32px -12px rgba(27, 58, 92, 0.18);
+  }
+
+  /* Public senior : on respecte la préférence système "réduire les animations" */
+  @media (prefers-reduced-motion: reduce) {
+    .gauge-fill { animation: none !important; stroke-dashoffset: var(--target-offset) !important; }
+  }
 
   /* Focus rings accessibles */
   button:focus-visible, a:focus-visible, textarea:focus-visible, input:focus-visible {
@@ -1458,19 +1474,22 @@ function PaperBG() {
 
 // ── Bannière de bienvenue après paiement Stripe réussi ─────────────
 function PaymentSuccessBanner({ formule, credits, onClose }) {
+  // Chiffres tirés de RECHARGE_CREDITS : une seule source de vérité,
+  // alignée sur ce que le webhook Stripe crédite réellement.
   const config = {
-    mensuel:  { label: "Abonnement mensuel",  ajout: 10,  emoji: "🎉" },
-    annuel:   { label: "Abonnement annuel",   ajout: 120, emoji: "🎊" },
-    recharge: { label: "Recharge",            ajout: 5,   emoji: "⚡" },
+    mensuel:  { label: "Abonnement mensuel",  ajout: RECHARGE_CREDITS.mensuel,  emoji: "🎉" },
+    annuel:   { label: "Abonnement annuel",   ajout: RECHARGE_CREDITS.annuel,   emoji: "🎊" },
+    recharge: { label: "Recharge",            ajout: RECHARGE_CREDITS.recharge, emoji: "⚡" },
   }[formule];
 
-  if (!config) return null;
-
-  // Auto-fermeture après 10 secondes
+  // Auto-fermeture après 30 secondes (cible senior : laisser le temps de lire)
+  // Le hook doit être appelé AVANT tout return conditionnel (règles des hooks React)
   useEffect(() => {
-    const t = setTimeout(onClose, 10000);
+    const t = setTimeout(onClose, 30000);
     return () => clearTimeout(t);
   }, [onClose]);
+
+  if (!config) return null;
 
   return (
     <div style={{
@@ -1547,7 +1566,7 @@ function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
           {session ? (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: FONT_SANS, maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.user?.email}</span>
-              <button onClick={onLogout} style={{ padding: "8px 12px", background: C.bgSubtle, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "13px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>Deconnexion</button>
+              <button onClick={onLogout} style={{ padding: "8px 12px", background: C.bgSubtle, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "13px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>Déconnexion</button>
             </div>
           ) : (
             <button onClick={onLogin} style={{ padding: "9px 16px", background: C.primary, color: "#FFF", border: "none", borderRadius: "9px", fontSize: "14px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>Se connecter</button>
@@ -1904,7 +1923,7 @@ function DualInput({ label, hint, textValue, onTextChange, pdfFile, onPdfChange,
   };
 
   const charCount = textValue?.length ?? 0;
-  const charColor = charCount > maxChars ? C.error : charCount > maxChars * 0.9 ? C.warning : C.textMuted;
+  const charColor = charCount > maxChars ? C.error : charCount > maxChars * 0.9 ? C.warningText : C.textMuted;
 
   return (
     <div>
@@ -1986,7 +2005,7 @@ function DualInput({ label, hint, textValue, onTextChange, pdfFile, onPdfChange,
             </div>
           </> : pdfFile && !pdfError ? <>
             <div style={{ fontSize: "44px", marginBottom: "12px" }}>{pdfInfo?.estPhoto ? "⚠️" : "✅"}</div>
-            <div style={{ fontSize: "18px", fontWeight: 600, color: pdfInfo?.estPhoto ? C.warning : C.success, marginBottom: "8px" }}>
+            <div style={{ fontSize: "18px", fontWeight: 600, color: pdfInfo?.estPhoto ? C.warningText : C.success, marginBottom: "8px" }}>
               {pdfFile.name}
             </div>
             <div style={{ fontSize: "14px", color: C.textMuted, fontWeight: 500 }}>
@@ -2016,7 +2035,7 @@ function InfoBox({ kind = "info", children }) {
   const map = {
     info:    { bg: C.primarySoft,  border: C.primary,  color: C.primary,  icon: "ℹ️" },
     success: { bg: C.successSoft,  border: C.success,  color: C.success,  icon: "✅" },
-    warning: { bg: C.warningSoft,  border: C.warning,  color: "#7A5A14",  icon: "⚠️" },
+    warning: { bg: C.warningSoft,  border: C.warning,  color: C.warningText,  icon: "⚠️" },
     error:   { bg: C.errorSoft,    border: C.error,    color: C.error,    icon: "⚠️" },
   };
   const s = map[kind];
@@ -2107,53 +2126,87 @@ function ScoreProgression({ scoreAvant, scoreApres }) {
   const gain = scoreApres - scoreAvant;
   const isGood = scoreApres >= 75;
   const color  = isGood ? C.success : scoreApres >= 50 ? C.warning : C.error;
-  const bg     = isGood ? C.successSoft : scoreApres >= 50 ? C.warningSoft : C.errorSoft;
+
+  // Jauge circulaire SVG — le cercle se remplit jusqu'au score
+  const radius = 45;
+  const circumference = 2 * Math.PI * radius;
+  const pct = Math.max(0, Math.min(100, Number(scoreApres) || 0));
+  const targetOffset = circumference - (pct / 100) * circumference;
+
   return (
-    <div style={{
-      background: bg,
-      border: `1px solid ${color}40`,
-      borderRadius: "14px",
-      padding: "24px 22px",
+    <div className="glass-panel" style={{
+      borderTop: `3px solid ${color}`,
+      borderRadius: "16px",
+      padding: "28px 24px",
       marginBottom: "24px",
       textAlign: "center",
       fontFamily: FONT_SANS,
     }}>
-      <div style={{ fontSize: "14px", color: C.textSecondary, fontWeight: 500, marginBottom: "14px", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+      <div style={{ fontSize: "14px", color: C.textSecondary, fontWeight: 600, marginBottom: "20px", letterSpacing: "0.05em", textTransform: "uppercase" }}>
         Score de compatibilité
       </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "28px", flexWrap: "wrap" }}>
         {/* Score avant */}
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 600, marginBottom: "2px" }}>
+          <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 600, marginBottom: "6px" }}>
             Avant
           </div>
-          <div style={{ fontSize: "38px", fontWeight: 700, color: C.textMuted, fontFamily: FONT_SERIF, lineHeight: 1 }}>
-            {scoreAvant}<span style={{ fontSize: "20px", opacity: 0.7 }}>%</span>
+          <div style={{ fontSize: "34px", fontWeight: 700, color: C.textMuted, fontFamily: FONT_SERIF, lineHeight: 1 }}>
+            {scoreAvant}<span style={{ fontSize: "18px", opacity: 0.7 }}>%</span>
           </div>
         </div>
-        {/* Flèche */}
-        <div style={{ fontSize: "30px", color, fontWeight: 700 }}>→</div>
-        {/* Score après */}
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "13px", color, fontWeight: 700, marginBottom: "2px" }}>
-            Après
+        {/* Jauge circulaire animée — score après */}
+        <div
+          role="img"
+          aria-label={`Score après optimisation : ${scoreApres} sur 100`}
+          style={{ position: "relative", width: "128px", height: "128px", display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <svg width="128" height="128" viewBox="0 0 128 128" aria-hidden="true" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
+            <circle cx="64" cy="64" r={radius} fill="none" stroke={`${color}22`} strokeWidth="9" />
+            <circle
+              className="gauge-fill"
+              cx="64" cy="64" r={radius} fill="none"
+              stroke={color} strokeWidth="9" strokeLinecap="round"
+              strokeDasharray={circumference}
+              strokeDashoffset={circumference}
+              style={{
+                "--target-offset": String(targetOffset),
+                animation: "fillGauge 1.4s cubic-bezier(0.25, 0.8, 0.3, 1) 0.2s forwards",
+              }}
+            />
+          </svg>
+          <div style={{ textAlign: "center", position: "relative" }}>
+            <div style={{ fontSize: "38px", fontWeight: 700, color, fontFamily: FONT_SERIF, lineHeight: 1 }}>
+              {scoreApres}<span style={{ fontSize: "19px", opacity: 0.7 }}>%</span>
+            </div>
+            <div style={{ fontSize: "12px", color: C.textSecondary, fontWeight: 700, marginTop: "3px", letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              Après
+            </div>
           </div>
-          <div style={{ fontSize: "56px", fontWeight: 700, color, fontFamily: FONT_SERIF, lineHeight: 1 }}>
-            {scoreApres}<span style={{ fontSize: "28px", opacity: 0.7 }}>%</span>
+        </div>
+        {/* Gain */}
+        <div style={{ textAlign: "center", maxWidth: "190px" }}>
+          <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 600, marginBottom: "8px" }}>
+            Gain
           </div>
+          {gain > 0 ? (
+            <div style={{
+              display: "inline-block",
+              background: C.success, color: "#FFF",
+              fontSize: "15px", fontWeight: 700,
+              padding: "7px 16px", borderRadius: "20px",
+              boxShadow: `0 4px 12px -4px ${C.success}80`,
+            }}>
+              🎉 +{gain} points
+            </div>
+          ) : (
+            <div style={{ fontSize: "14px", color: C.textSecondary, fontStyle: "italic" }}>
+              Déjà optimisé
+            </div>
+          )}
         </div>
       </div>
-      {gain > 0 && (
-        <div style={{
-          display: "inline-block", marginTop: "14px",
-          background: C.success, color: "#FFF",
-          fontSize: "15px", fontWeight: 700,
-          padding: "6px 16px", borderRadius: "20px",
-        }}>
-          🎉 +{gain} points gagnés
-        </div>
-      )}
-      <p style={{ fontSize: "15px", color: C.text, marginTop: "14px", marginBottom: 0, fontWeight: 500, lineHeight: 1.5 }}>
+      <p style={{ fontSize: "15px", color: C.text, marginTop: "18px", marginBottom: 0, fontWeight: 500, lineHeight: 1.5 }}>
         {gain > 0
           ? "Votre CV optimisé passe bien mieux les filtres des recruteurs."
           : "Votre CV était déjà bien positionné pour cette offre."}
@@ -2307,7 +2360,8 @@ function CVPreview({ cv, secteur, avecPhoto, couleurCustom, sectionsMasquees, fo
   useEffect(() => {
     const calcScale = () => {
       const w = wrapRef.current?.offsetWidth || A4_WIDTH_PX;
-      setScale(Math.min(1, w / A4_WIDTH_PX));
+      // -36 : padding latéral du "bureau" de présentation + bordures
+      setScale(Math.min(1, (w - 36) / A4_WIDTH_PX));
     };
     calcScale();
     window.addEventListener("resize", calcScale);
@@ -2354,14 +2408,21 @@ function CVPreview({ cv, secteur, avecPhoto, couleurCustom, sectionsMasquees, fo
   }
 
   return (
-    <div ref={wrapRef} style={{ width: "100%", fontFamily: FONT_SANS }}>
+    <div ref={wrapRef} style={{
+      width: "100%", fontFamily: FONT_SANS,
+      // "Bureau" de présentation : la page A4 semble posée sur une table
+      background: "linear-gradient(160deg, #ECE7DC, #E2DACB)",
+      border: `1px solid ${C.border}`,
+      borderRadius: "16px",
+      padding: "28px 16px 18px",
+      display: "flex", flexDirection: "column", alignItems: "center",
+    }}>
       <div style={{
+        width: A4_WIDTH_PX * scale,
         height: A4_HEIGHT_PX * scale,
         overflow: "hidden",
-        borderRadius: "10px",
-        border: `1px solid ${C.border}`,
-        boxShadow: "0 4px 20px rgba(0,0,0,0.12)",
         background: "#fff",
+        boxShadow: "0 25px 50px -12px rgba(26,22,18,0.28), 0 2px 8px rgba(26,22,18,0.08)",
       }}>
         <iframe
           title="Aperçu de votre CV"
@@ -2373,12 +2434,16 @@ function CVPreview({ cv, secteur, avecPhoto, couleurCustom, sectionsMasquees, fo
             border: "none",
             transform: `scale(${scale})`,
             transformOrigin: "top left",
+            // L'aperçu n'est PAS éditable : le template garde des zones
+            // contenteditable et une modification ici serait perdue au
+            // téléchargement (le HTML est régénéré depuis l'état React).
+            pointerEvents: "none",
           }}
         />
       </div>
       <p style={{
-        fontSize: "13px", color: C.textMuted, textAlign: "center",
-        marginTop: "10px", fontWeight: 500,
+        fontSize: "13px", color: C.textSecondary, textAlign: "center",
+        marginTop: "18px", marginBottom: 0, fontWeight: 500,
       }}>
         Aperçu réel de votre CV — c'est exactement ce que vous allez télécharger.
       </p>
@@ -2392,20 +2457,28 @@ function PactePersonnalisation({ onPersonnaliser, dejaCorrige }) {
   if (dejaCorrige) return null; // une fois que la personne a corrigé, on n'insiste plus
   return (
     <div style={{
-      background: C.warningSoft,
-      border: `1px solid ${C.warning}55`,
-      borderLeft: `5px solid ${C.warning}`,
-      borderRadius: "12px",
+      background: `linear-gradient(145deg, #FFFFFF, ${C.bgSubtle})`,
+      border: `1px solid ${C.accent}40`,
+      borderLeft: `5px solid ${C.accent}`,
+      borderRadius: "14px",
       padding: "22px 24px",
       marginBottom: "20px",
       fontFamily: FONT_SANS,
+      boxShadow: "0 10px 30px -18px rgba(168,93,44,0.35)",
+      position: "relative",
+      overflow: "hidden",
     }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-        <span style={{ fontSize: "30px", lineHeight: 1, flexShrink: 0 }}>💡</span>
+      <div aria-hidden="true" style={{
+        position: "absolute", top: "-24px", right: "-16px",
+        fontSize: "110px", opacity: 0.05, transform: "rotate(-15deg)",
+        pointerEvents: "none", userSelect: "none",
+      }}>✒️</div>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", position: "relative" }}>
+        <span style={{ fontSize: "30px", lineHeight: 1, flexShrink: 0 }}>✍️</span>
         <div style={{ flex: 1 }}>
           <h3 style={{
-            margin: 0, fontSize: "17px", fontWeight: 700,
-            color: "#7A5A14", fontFamily: FONT_SANS, lineHeight: 1.4,
+            margin: 0, fontSize: "19px", fontWeight: 700,
+            color: C.accentDark, fontFamily: FONT_SERIF, lineHeight: 1.4,
           }}>
             Avant de télécharger, prenez 2 minutes pour personnaliser
           </h3>
@@ -2418,9 +2491,9 @@ function PactePersonnalisation({ onPersonnaliser, dejaCorrige }) {
             Votre touche personnelle est ce qui fait la différence aux yeux d'un humain.
           </p>
           <div style={{
-            background: C.bgCard,
-            border: `1px solid ${C.warning}33`,
-            borderRadius: "8px",
+            background: "rgba(255,255,255,0.75)",
+            border: `1px solid ${C.border}`,
+            borderRadius: "10px",
             padding: "12px 14px",
             marginBottom: "14px",
             fontSize: "13.5px",
@@ -2437,14 +2510,14 @@ function PactePersonnalisation({ onPersonnaliser, dejaCorrige }) {
           <button
             onClick={onPersonnaliser}
             style={{
-              padding: "12px 22px",
+              padding: "13px 24px",
               borderRadius: "10px",
               border: "none",
-              background: C.warning,
+              background: C.accent,
               color: "#FFF",
               fontSize: "15px", fontWeight: 700, fontFamily: FONT_SANS,
               cursor: "pointer",
-              boxShadow: "0 2px 6px rgba(184,133,28,0.25)",
+              boxShadow: "0 4px 14px -4px rgba(168,93,44,0.5)",
             }}
           >
             ✏️ Personnaliser mon CV maintenant
@@ -2961,199 +3034,6 @@ function PreviewBanner() {
   );
 }
 
-// ── Paywall — clair, rassurant, prix bien visibles ──────────────────
-function BlurPaywall({ content }) {
-  const lines   = content.split("\n");
-  const preview = lines.slice(0, 4).join("\n");
-  const hidden  = lines.slice(4).join("\n");
-  const [selected, setSelected] = useState("annuel");
-
-  const FORMULES = {
-    annuel: {
-      label: "Abonnement annuel",
-      prix: "24,99 €", sous: "soit 2,08 € / mois",
-      items: ["120 crédits inclus pour l'année", "Économisez 30 % vs mensuel", "Accès complet 12 mois"],
-      href: STRIPE_ANNUEL,
-      cta: "Choisir l'annuel à 24,99 €",
-      badge: "★ Meilleure offre",
-      credits: RECHARGE_CREDITS.annuel,
-    },
-    mensuel: {
-      label: "Abonnement mensuel",
-      prix: "2,99 €", sous: "par mois, sans engagement",
-      items: ["10 crédits par mois", "Résiliable à tout moment", "Idéal pour tester"],
-      href: STRIPE_MENSUEL,
-      cta: "S'abonner à 2,99 € / mois",
-      credits: RECHARGE_CREDITS.mensuel,
-    },
-    recharge: {
-      label: "Recharge rapide",
-      prix: "1,99 €", sous: "paiement unique",
-      items: ["5 crédits supplémentaires", "Sans abonnement", "Utilisable immédiatement"],
-      href: STRIPE_RECHARGE,
-      cta: "Prendre 5 crédits — 1,99 €",
-      credits: RECHARGE_CREDITS.recharge,
-    },
-  };
-  const f = FORMULES[selected];
-
-  return (
-    <div style={{
-      borderRadius: "14px", overflow: "hidden",
-      border: `2px solid ${C.border}`,
-      fontFamily: FONT_SANS,
-    }}>
-      {/* Aperçu visible (4 premières lignes) */}
-      <div style={{
-        background: C.bgSubtle,
-        padding: "24px 28px",
-        fontSize: "16px",
-        lineHeight: 1.85,
-        whiteSpace: "pre-wrap",
-        color: C.text,
-        fontFamily: FONT_SANS,
-        borderBottom: `1px solid ${C.border}`,
-      }}>
-        {preview}
-      </div>
-
-      {/* Zone floue + offre */}
-      <div style={{ position: "relative" }}>
-        <div style={{
-          background: C.bgSubtle,
-          padding: "24px 28px",
-          fontSize: "16px", lineHeight: 1.85,
-          whiteSpace: "pre-wrap", color: C.text,
-          filter: "blur(6px)", userSelect: "none",
-          minHeight: "240px",
-        }}>
-          {hidden || "La suite de votre document apparaît ici, masquée jusqu'au paiement."}
-        </div>
-
-        <div style={{
-          position: "absolute", inset: 0,
-          background: "rgba(255,255,255,0.97)",
-          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start",
-          padding: "28px 20px", overflowY: "auto",
-        }}>
-          <div style={{ fontSize: "44px", marginBottom: "10px" }}>🔓</div>
-          <h3 style={{
-            margin: 0, fontSize: "22px", fontWeight: 700,
-            fontFamily: FONT_SERIF, color: C.text, textAlign: "center",
-          }}>
-            Débloquez votre dossier complet
-          </h3>
-          <p style={{
-            margin: "8px 0 20px", fontSize: "15px", color: C.textSecondary,
-            textAlign: "center", maxWidth: "440px", lineHeight: 1.5,
-          }}>
-            CV complet, lettre de motivation et téléchargement au format prêt à imprimer.
-          </p>
-
-          {/* Cartes empilées verticalement — meilleure lisibilité mobile/senior */}
-          <div style={{
-            display: "flex", flexDirection: "column", gap: "10px",
-            width: "100%", maxWidth: "500px", marginBottom: "16px",
-          }}>
-            {Object.entries(FORMULES).map(([key, fm]) => {
-              const sel = selected === key;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setSelected(key)}
-                  style={{
-                    padding: "16px 18px",
-                    borderRadius: "12px",
-                    border: `2px solid ${sel ? C.primary : C.border}`,
-                    background: sel ? C.primarySoft : C.bgCard,
-                    cursor: "pointer", textAlign: "left", position: "relative",
-                    transition: "all 0.15s ease",
-                    fontFamily: FONT_SANS,
-                  }}
-                >
-                  {fm.badge && (
-                    <div style={{
-                      position: "absolute", top: "-10px", right: "16px",
-                      background: C.accent, color: "#FFF",
-                      fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "10px",
-                      letterSpacing: "0.04em",
-                    }}>
-                      {fm.badge}
-                    </div>
-                  )}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", flexWrap: "wrap" }}>
-                    <div style={{ fontSize: "14px", color: C.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.04em" }}>
-                      {fm.label}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                      <span style={{ fontSize: "22px", fontWeight: 700, color: sel ? C.primary : C.text, fontFamily: FONT_SERIF, lineHeight: 1 }}>
-                        {fm.prix}
-                      </span>
-                      <span style={{ fontSize: "12px", color: C.textSecondary, fontWeight: 500 }}>
-                        {fm.sous}
-                      </span>
-                    </div>
-                  </div>
-                  <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "4px" }}>
-                    {fm.items.map((item, i) => (
-                      <div key={i} style={{ fontSize: "13px", color: C.textSecondary, display: "flex", gap: "6px", alignItems: "flex-start" }}>
-                        <span style={{ color: C.success, fontWeight: 700, flexShrink: 0 }}>✓</span>
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <a href={f.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none", width: "100%", maxWidth: "500px" }}>
-            <div style={{
-              minHeight: "60px",
-              padding: "18px 24px",
-              borderRadius: "12px",
-              background: C.accent,
-              color: "#FFF",
-              fontSize: "17px",
-              fontWeight: 700,
-              textAlign: "center",
-              cursor: "pointer",
-              boxShadow: "0 4px 12px rgba(168,93,44,0.3)",
-              transition: "transform 0.1s ease",
-              fontFamily: FONT_SANS,
-            }}>
-              {f.cta}
-            </div>
-          </a>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "14px", fontSize: "13px", color: C.textMuted, fontWeight: 500, textAlign: "center" }}>
-            <span style={{ fontSize: "16px" }}>🔒</span>
-            Paiement 100 % sécurisé par Stripe
-          </div>
-
-          {/* Info paiement automatique */}
-          <div style={{
-            marginTop: "14px",
-            background: C.successSoft,
-            border: `1px solid ${C.success}33`,
-            borderRadius: "10px",
-            padding: "10px 16px",
-            fontSize: "13px",
-            color: C.textSecondary,
-            textAlign: "center",
-            maxWidth: "500px",
-            lineHeight: 1.5,
-          }}>
-            ✓ Vos crédits seront <strong>ajoutés automatiquement</strong> dès le paiement validé.
-            <br/>
-            Un problème ? <a href={`mailto:${SUPPORT_EMAIL}`} style={{ color: C.primary, fontWeight: 600 }}>{SUPPORT_EMAIL}</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ── Suggestions de reconversion ─────────────────────────────────────
 function PivotCard({ pivots, onSelect }) {
   return (
@@ -3184,7 +3064,7 @@ function PivotCard({ pivots, onSelect }) {
               <strong style={{ color: C.success }}>Votre force : </strong>{p.passerelle}
             </p>
             <p style={{ fontSize: "14px", color: C.textSecondary, lineHeight: 1.6, marginBottom: "16px", marginTop: 0 }}>
-              <strong style={{ color: C.warning }}>À combler : </strong>{p.gap}
+              <strong style={{ color: C.warningText }}>À combler : </strong>{p.gap}
             </p>
             <button
               onClick={() => onSelect(p.metier)}
@@ -3256,7 +3136,7 @@ function AuthModal({ open, onClose }) {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({ email: email.trim(), password });
         if (error) throw error;
-        setMsg({ ok: true, text: "Compte cree ! Verifiez votre boite mail pour confirmer votre adresse, puis connectez-vous." });
+        setMsg({ ok: true, text: "Compte créé ! Vérifiez votre boîte mail pour confirmer votre adresse, puis connectez-vous." });
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         if (error) throw error;
@@ -3275,17 +3155,17 @@ function AuthModal({ open, onClose }) {
   return (
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(20,22,18,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: C.bgCard, borderRadius: "18px", padding: "32px 28px", width: "100%", maxWidth: "420px", boxShadow: "0 30px 60px -20px rgba(0,0,0,0.4)", fontFamily: FONT_SANS }}>
-        <h2 style={{ margin: "0 0 6px", fontFamily: FONT_SERIF, fontSize: "24px", color: C.primary }}>{mode === "signup" ? "Creer un compte" : "Se connecter"}</h2>
-        <p style={{ margin: "0 0 20px", fontSize: "14px", color: C.textSecondary }}>Vos credits sont lies a votre compte.</p>
+        <h2 style={{ margin: "0 0 6px", fontFamily: FONT_SERIF, fontSize: "24px", color: C.primary }}>{mode === "signup" ? "Créer un compte" : "Se connecter"}</h2>
+        <p style={{ margin: "0 0 20px", fontSize: "14px", color: C.textSecondary }}>Vos crédits sont liés à votre compte.</p>
         <button onClick={googleLogin} style={{ width: "100%", padding: "12px", background: "#FFF", color: C.text, border: `1.5px solid ${C.border}`, borderRadius: "10px", fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer", marginBottom: "14px" }}>Continuer avec Google</button>
         <div style={{ textAlign: "center", fontSize: "12px", color: C.textMuted, margin: "0 0 14px" }}>- ou -</div>
         <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Votre e-mail" style={{ width: "100%", padding: "12px 14px", border: `1.5px solid ${C.inputBorder}`, borderRadius: "10px", fontSize: "15px", fontFamily: FONT_SANS, marginBottom: "10px", boxSizing: "border-box" }} />
         <input value={password} onChange={(e) => setPassword(e.target.value)} type="password" placeholder="Mot de passe" style={{ width: "100%", padding: "12px 14px", border: `1.5px solid ${C.inputBorder}`, borderRadius: "10px", fontSize: "15px", fontFamily: FONT_SANS, marginBottom: "14px", boxSizing: "border-box" }} />
-        <button onClick={submit} disabled={busy} style={{ width: "100%", padding: "13px", background: C.primary, color: "#FFF", border: "none", borderRadius: "10px", fontSize: "16px", fontWeight: 700, fontFamily: FONT_SANS, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? "..." : (mode === "signup" ? "Creer mon compte" : "Se connecter")}</button>
+        <button onClick={submit} disabled={busy} style={{ width: "100%", padding: "13px", background: C.primary, color: "#FFF", border: "none", borderRadius: "10px", fontSize: "16px", fontWeight: 700, fontFamily: FONT_SANS, cursor: busy ? "wait" : "pointer", opacity: busy ? 0.7 : 1 }}>{busy ? "..." : (mode === "signup" ? "Créer mon compte" : "Se connecter")}</button>
         {msg && (<div style={{ marginTop: "12px", fontSize: "13px", textAlign: "center", fontWeight: 600, color: msg.ok ? C.success : C.error }}>{msg.text}</div>)}
         <div style={{ marginTop: "16px", textAlign: "center", fontSize: "14px", color: C.textSecondary }}>
-          {mode === "signup" ? "Deja un compte ?" : "Pas encore de compte ?"}{" "}
-          <button onClick={() => { setMode(mode === "signup" ? "login" : "signup"); setMsg(null); }} style={{ background: "none", border: "none", color: C.primary, fontWeight: 700, cursor: "pointer", fontSize: "14px", fontFamily: FONT_SANS }}>{mode === "signup" ? "Se connecter" : "Creer un compte"}</button>
+          {mode === "signup" ? "Déjà un compte ?" : "Pas encore de compte ?"}{" "}
+          <button onClick={() => { setMode(mode === "signup" ? "login" : "signup"); setMsg(null); }} style={{ background: "none", border: "none", color: C.primary, fontWeight: 700, cursor: "pointer", fontSize: "14px", fontFamily: FONT_SANS }}>{mode === "signup" ? "Se connecter" : "Créer un compte"}</button>
         </div>
       </div>
     </div>
@@ -3500,7 +3380,7 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
           <div style={{ fontSize: "14px", fontWeight: 600, color: C.text, marginBottom: "8px", textAlign: "center" }}>Vous avez un code cadeau ?</div>
           <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
             <input value={codeInput} onChange={(e) => setCodeInput(e.target.value)} placeholder="Entrez votre code" style={{ flex: 1, minWidth: "180px", padding: "10px 14px", border: `1.5px solid ${C.inputBorder}`, borderRadius: "10px", fontSize: "15px", fontFamily: FONT_SANS, textTransform: "uppercase" }} />
-            <button onClick={() => { const r = onRedeem(codeInput); if (r.ok) { setCodeMsg({ ok: true, text: r.credits + " credits ajoutes ! Vous avez maintenant " + r.total + " credits." }); setCodeInput(""); } else if (r.raison === "deja") { setCodeMsg({ ok: false, text: "Ce code a deja ete utilise." }); } else { setCodeMsg({ ok: false, text: "Code invalide." }); } }} style={{ padding: "10px 18px", background: C.primary, color: "#FFF", border: "none", borderRadius: "10px", fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>Valider</button>
+            <button onClick={() => { const r = onRedeem(codeInput); if (r.ok) { setCodeMsg({ ok: true, text: r.credits + " crédits ajoutés ! Vous avez maintenant " + r.total + " crédits." }); setCodeInput(""); } else if (r.raison === "deja") { setCodeMsg({ ok: false, text: "Ce code a déjà été utilisé." }); } else { setCodeMsg({ ok: false, text: "Code invalide." }); } }} style={{ padding: "10px 18px", background: C.primary, color: "#FFF", border: "none", borderRadius: "10px", fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>Valider</button>
           </div>
           {codeMsg && (<div style={{ marginTop: "8px", fontSize: "13px", textAlign: "center", fontWeight: 600, color: codeMsg.ok ? C.success : C.error }}>{codeMsg.text}</div>)}
         </div>
@@ -3554,6 +3434,13 @@ export default function App() {
 
   useEffect(() => { loadPdfJs().catch(() => {}); }, []);
 
+  // ── Remonter en haut de page à chaque changement d'étape ──────────
+  // Sans ça, sur mobile, cliquer "Continuer" en bas de page laisse
+  // l'utilisateur au milieu de la carte suivante — très désorientant.
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [step]);
+
   // ── Bloquer Google Translate (cause documentée de crash dans React) ──
   // Le traducteur modifie le DOM en arrière-plan, ce qui peut faire planter
   // React avec "removeChild: node is not a child of this node". On désactive
@@ -3589,7 +3476,7 @@ export default function App() {
     const r = utiliserCodeCadeau(code);
     if (r.ok) {
       setCredits(r.total);
-      setTimeout(() => alert("Code cadeau valide ! " + r.credits + " credits ont ete ajoutes a votre compte."), 300);
+      setTimeout(() => alert("Code cadeau validé ! " + r.credits + " crédits ont été ajoutés à votre compte."), 300);
     }
   }, []);
 
@@ -4106,7 +3993,7 @@ export default function App() {
               )}
               {analyse.pointsFaibles.length > 0 && (
                 <div style={{ background: C.warningSoft, border: `1px solid ${C.warning}33`, borderRadius: "12px", padding: "18px 22px", fontFamily: FONT_SANS }}>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: "#7A5A14", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: C.warningText, marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     À améliorer
                   </div>
                   {analyse.pointsFaibles.map((p, i) => (

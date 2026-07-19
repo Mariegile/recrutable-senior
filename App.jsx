@@ -159,7 +159,7 @@ const THEMES = {
   default:      { primary: "#1B3A5C", accent: "#A85D2C", font: "Georgia, serif" },
 };
 
-const SECTEURS_VALIDES = ["finance","sante","tech","commerce","rh","btp","education","restauration","default"];
+const SECTEURS_VALIDES = ["finance","sante","tech","commerce","rh","btp","education","restauration","juridique","logistique","marketing","industrie","immobilier","assistanat","banque","securite","default"];
 
 // Thèmes de couleur que l'utilisateur peut choisir manuellement (édition contrôlée)
 const THEMES_CHOISISSABLES = [
@@ -621,6 +621,7 @@ const STOP_WORDS_EN = new Set([
   "experience","experienced","skills","skill","strong","good","great","excellent","ability","abilities","including","required","requirements",
   "plus","bonus","nice","must","preferred","minimum","least","well","within","across","around","between","upon","toward","towards",
   "will","make","made","take","takes","help","helps","need","needs","want","wants","like","use","using","used",
+  "hiring","seeking","opportunity","opportunities","responsibilities","qualifications","duties","benefits","salary","offer","offers","location","currently","ideal","successful",
 ]);
 
 // ── Détection simple de la langue d'un texte (fr / en) ─────────────
@@ -671,6 +672,14 @@ const SECTEUR_KEYWORDS = {
     "serveur","serveuse","sommelier","sommelière","barman","barmaid","maître","hôtel","brigade","service","clientèle",
     "carte","menu","menus","plat","plats","produit","frais","frais","saison","local","bio","traiteur","banquet","événementiel",
     "haccp","hygiène","sécurité","alimentaire","norme","norm","tva","caisse","encaissement","fidélité","réservation","réservations"],
+  juridique: ["avocat", "juriste", "notaire", "paralegal", "magistrat", "huissier", "plaidoirie", "litige", "jurisprudence", "contractuel", "préjudice", "corporate", "contentieux", "droit civil", "droit pénal", "droit commercial", "fiscalité", "propriété intellectuelle", "secib", "jarvis", "kleos", "lexisnexis", "docusign", "hyperlex", "legisway", "capa", "rgpd", "dpo", "master droit", "m2 droit", "plaider", "contracter", "instruire"],
+  logistique: ["cariste", "affréteur", "commissionnaire", "supply chain", "stockiste", "gestionnaire stock", "entreposage", "messagerie", "routeur", "manutentionnaire", "transitaire", "ordonnancement", "palettisation", "groupage", "cross-dock", "intermodal", "approvisionneur", "préparateur commandes", "reflex wms", "manhattan active", "speed wms", "generix wms", "shiptify", "dashdoc", "acteos tms", "incoterms", "adr", "fimo", "fco", "certificat adr", "affréter", "palettiser", "expédier", "approvisionner"],
+  marketing: ["community manager", "growth hacker", "traffic manager", "chef produit", "média planeur", "brand content", "netlinking", "storytelling", "référencement", "marketing influence", "relations presse", "génération leads", "webmarketing", "ergonomie web", "inbound marketing", "conversion", "acquisition client", "copywriter", "google ads", "google analytics", "hubspot", "semrush", "mailchimp", "canva", "hootsuite", "certification google", "certification hubspot", "ga4", "facebook blueprint", "référencer", "scénariser", "promouvoir", "segmenter"],
+  industrie: ["opérateur usinage", "chef d'atelier", "tourneur", "fraiseur", "régleur", "chaudronnier", "soudeur", "automaticien", "dessinateur industriel", "ingénieur méthodes", "lean manufacturing", "maintenance préventive", "maintenance curative", "gmao", "automatisme", "chaîne montage", "soudure", "tuyauterie", "autocad", "solidworks", "catia", "siemens nx", "sap pm", "mainsim", "dimomaint", "six sigma", "green belt", "black belt", "iso 9001", "kaizen", "usiner", "fraiser", "emboutir", "calibrer", "assembler"],
+  immobilier: ["agent immobilier", "négociateur immobilier", "administrateur biens", "promoteur", "marchand biens", "gestionnaire locatif", "asset manager", "conseiller transaction", "chasseur appartement", "mandataire immobilier", "syndic", "mandat exclusivité", "loyer", "compromis vente", "acte authentique", "valeur vénale", "état lieux", "yardi", "mri software", "realpage", "immofacile", "hektor", "pige online", "apimo", "carte t", "carte g", "dpe", "breeam", "leed", "piger", "estimer", "copropriété"],
+  assistanat: ["assistant direction", "secrétaire administrative", "office manager", "assistant bilingue", "secrétaire médicale", "assistant gestion", "assistant commercial", "secrétariat", "accueil physique", "gestion courrier", "archivage", "prise notes", "compte-rendu", "saisie données", "standard téléphonique", "gestion fournitures", "facturation", "cegid", "sage 100", "pennylane", "ebp", "trello", "asana", "microsoft outlook", "projet voltaire", "tosa excel", "certification tosa", "icdl", "pcie", "facturer", "archiver", "classer", "accueillir", "planifier"],
+  banque: ["conseiller clientèle", "chargé clientèle", "gestionnaire patrimoine", "actuaire", "courtier", "souscripteur", "analyste crédit", "opérateur marché", "trader", "arbitrage", "sinistre", "assurance vie", "gestion d'actifs", "crédit immobilier", "solvabilité", "réassurance", "indemnisation", "banque privée", "avaloq", "temenos", "murex", "calypso", "guidewire", "sopra banking", "sab2", "certification amf", "habilitation orias", "solvabilité ii", "bâle iii", "souscrire", "indemniser", "arbitrer", "réassurer"],
+  securite: ["agent sécurité", "vigile", "rondier", "agent cynophile", "maître-chien", "inspecteur magasin", "garde corps", "opérateur télésurveillance", "convoyeur fonds", "sécurité incendie", "sûreté", "télésurveillance", "vidéoprotection", "ronde nuit", "contrôle d'accès", "palpation", "moyens secours", "main courante", "genetec", "milestone xprotect", "avigilon", "lenel", "bosch security", "honeywell maxpro", "ssiap 1", "ssiap 2", "ssiap 3", "cqp aps", "tfp aps", "patrouiller", "surveiller", "interpeller"],
 };
 
 // ── Mots-clés sectoriels anglais (offres/CV anglophones) ──────────
@@ -701,7 +710,43 @@ const SECTEUR_KEYWORDS_EN = {
   restauration: ["kitchen","cook","cooking","chef","pastry","baker","bakery","waiter","waitress","bartender",
     "sommelier","hospitality","restaurant","catering","banquet","menu","dishes","ingredients","culinary",
     "food","beverage","service","guests","reservations","foh","boh"],
+  juridique: ["solicitor", "barrister", "paralegal", "attorney", "litigation", "corporate law", "compliance officer", "jurisprudence", "tort", "contract law", "liability", "arbitration", "counsel", "public law", "intellectual property", "legaltech", "non-disclosure", "dispute resolution", "relativity", "casemap", "clio", "ironclad", "contractbook", "practical law", "everlaw", "bar exam", "gdpr", "llm", "solicitor qualification", "ccep", "plead", "litigate", "prosecute"],
+  logistique: ["forklift operator", "order picker", "freight forwarder", "supply planner", "stock controller", "warehousing", "inventory management", "shipping clerk", "dispatcher", "material handler", "customs broker", "cross-docking", "intermodal transport", "procurement specialist", "freight brokerage", "third-party logistics", "last-mile delivery", "reverse logistics", "manhattan wms", "blue yonder", "oracle wms", "adr certification", "dangerous goods", "apics certification", "cscp", "dispatch", "palletize", "replenish"],
+  marketing: ["copywriter", "community manager", "growth hacker", "traffic manager", "brand manager", "media planner", "brand content", "netlinking", "storytelling", "seo specialist", "influencer marketing", "public relations", "lead generation", "digital marketing", "conversion rate", "social strategy", "inbound marketing", "copywriting", "ads certification", "hubspot academy", "ga4 certification", "meta blueprint", "google certified", "promote", "segment", "convert"],
+  industrie: ["cnc machinist", "floor manager", "lathe operator", "millwright", "toolmaker", "boilermaker", "welder", "automation engineer", "cad designer", "process engineer", "preventive maintenance", "corrective maintenance", "cmms", "industrial automation", "assembly line", "welding", "piping", "weld", "calibrate", "extrude"],
+  immobilier: ["property manager", "leasing agent", "escrow officer", "title agent", "appraiser", "landlord", "tenant", "lease agreement", "property portfolio", "tenancy", "closing costs", "foreclosure", "housing agent", "brokerage firm", "exclusivity agreement", "leasing consultant", "valuation specialist", "appfolio", "buildium", "argus enterprise", "leed ap", "breeam certified", "mrics", "cpm", "ccim", "lease", "appraise", "refinance", "sublet"],
+  assistanat: ["executive assistant", "administrative assistant", "office manager", "receptionist", "medical secretary", "clerical support", "legal secretary", "personal assistant", "calendar management", "entry clerk", "meeting minutes", "filing", "travel coordination", "bookkeeping", "invoice processing", "office supply", "expense reporting", "mail distribution", "concur", "notion", "quickbooks", "cap certification", "mos master", "icdl certified", "iaap", "schedule", "organize"],
+  banque: ["investment banker", "wealth manager", "risk evaluator", "actuary", "insurance broker", "credit analyst", "asset management", "private banking", "reinsurance", "claims adjuster", "solvency", "mortgage loan", "portfolio management", "capital markets", "retail banking", "structured finance", "derivatives", "temenos transact", "aladdin", "cfa charter", "frm certified", "series 7", "series 63", "basel iii", "hedge portfolio", "reinsure", "amortize"],
+  securite: ["security guard", "loss prevention", "bodyguard", "surveillance operator", "armored guard", "fire watch", "cctv monitoring", "access control", "patrolling", "incident report", "perimeter security", "threat assessment", "risk prevention", "emergency response", "evacuation drill", "crowd control", "asset protection", "physical security", "lenels2", "ccure", "gallagher", "sia licence", "cpp certified", "psp certified", "safety certificate", "osha 30", "patrol", "apprehend", "evacuate", "deescalate"],
 };
+
+// ── Enrichissement Deep Research : secteurs existants ─────────────
+const ENRICH_SECTEURS_FR = {
+  finance: ["consolidation", "contrôle gestion", "comptabilité générale", "grand livre", "règlementation bancaire", "analyse financière", "flux trésorerie", "évaluation financière", "dette", "fusions-acquisitions", "comptable unique"],
+  sante: ["médecin", "chirurgien", "ordonnance", "posologie", "pathologie", "dossier patient", "soins palliatifs", "kinésithérapeute"],
+  tech: ["kubernetes", "cybersecurité", "architecture cloud", "base données", "intelligence artificielle", "développeur backend", "développeur frontend", "api rest", "génie logiciel", "apprentissage automatique", "administration système", "intégration continue"],
+  commerce: ["force vente", "relation client", "tunnel vente", "vente directe", "fidélisation client", "prévisions vente", "point vente", "marchandisage", "administration ventes", "développement commercial"],
+  rh: ["gestion talents", "entretien embauche", "intégration collaborateur", "contrat travail", "relations sociales", "marque employeur", "formation professionnelle", "médecine travail", "fiche poste", "dialogue social"],
+  btp: ["second oeuvre", "sécurité chantier", "béton armé", "échafaudage", "devis ouvrage", "maître oeuvre", "thermique bâtiment"],
+  education: ["didactique", "classe virtuelle", "programme scolaire", "soutien scolaire", "instituteur", "didacticiel", "e-learning", "capes", "rectorat", "conseiller orientation"],
+  restauration: ["service salle", "plonge", "commis cuisine", "chef partie", "dressage assiette", "carte vins", "œnologie", "brigade cuisine", "restaurateur", "stocks alimentaires"],
+};
+const ENRICH_SECTEURS_EN = {
+  finance: ["treasury", "financial planning", "cash flow", "consolidation", "general ledger", "financial analysis", "valuation", "debt management", "mergers acquisitions", "bookkeeper", "capital budgeting", "profit loss"],
+  sante: ["physician", "surgeon", "caregiver", "prescription", "dosage", "pathology", "patient records", "palliative care", "nursing home", "clinical trials", "physiotherapist"],
+  tech: ["kubernetes", "cybersecurity", "cloud architecture", "database management", "artificial intelligence", "backend developer", "frontend developer", "rest api", "software engineering", "machine learning", "system administration", "continuous integration"],
+  commerce: ["prospecting", "sales negotiation", "sales force", "customer relations", "sales funnel", "direct selling", "customer retention", "sales forecasting", "retail pos", "merchandising", "sales administration", "business development"],
+  rh: ["talent management", "job interview", "employee onboarding", "employment contract", "labor relations", "employer branding", "workforce planning", "employee training", "occupational health", "job description", "social dialogue"],
+  btp: ["rough build", "finishing trade", "site manager", "construction safety", "reinforced concrete", "scaffolding", "quantity surveying", "foreman", "masonry", "carpentry", "building thermal"],
+  education: ["didactics", "pedagogy", "virtual classroom", "curriculum", "tutoring", "continuing education", "primary teacher", "courseware", "distance learning", "teaching certification", "school board", "guidance counselor"],
+  restauration: ["table service", "dishwashing", "commis chef", "chef partie", "plating", "wine list", "oenology", "kitchen staff", "tray service", "restaurant manager", "food stock", "kitchen supply"],
+};
+for (const [s, mots] of Object.entries(ENRICH_SECTEURS_FR)) {
+  SECTEUR_KEYWORDS[s] = [...new Set([...(SECTEUR_KEYWORDS[s] || []), ...mots])];
+}
+for (const [s, mots] of Object.entries(ENRICH_SECTEURS_EN)) {
+  SECTEUR_KEYWORDS_EN[s] = [...new Set([...(SECTEUR_KEYWORDS_EN[s] || []), ...mots])];
+}
 
 // ── Verbes d'action (signe positif dans un CV) ────────────────────
 const VERBES_ACTION = new Set([
@@ -837,6 +882,71 @@ const ACRONYMES = [
   ["caces", "conduite engins"],
   ["haccp", "hygiene securite alimentaire"],
   ["qse", "qualite securite environnement"],
+  ["pmp", "project management professional"],
+  ["cpa", "certified public accountant"],
+  ["cpa", "cost per acquisition"],
+  ["sphr", "senior professional in human resources"],
+  ["toeic", "test of english for international communication"],
+  ["toefl", "test of english as a foreign language"],
+  ["cfa", "chartered financial analyst"],
+  ["frm", "financial risk manager"],
+  ["pmi", "project management institute"],
+  ["itil", "information technology infrastructure library"],
+  ["prince2", "projects in controlled environments"],
+  ["cissp", "certified information systems security professional"],
+  ["ccna", "cisco certified network associate"],
+  ["aws", "amazon web services"],
+  ["gcp", "google cloud platform"],
+  ["ssiap", "service securite incendie assistance personnes"],
+  ["vtc", "voiture transport chauffeur"],
+  ["fimo", "formation initiale minimale obligatoire"],
+  ["fco", "formation continue obligatoire"],
+  ["sst", "sauveteur secouriste travail"],
+  ["adr", "accord dangerous goods road"],
+  ["cnaps", "conseil national activites privees securite"],
+  ["rgpd", "reglement general protection donnees"],
+  ["gdpr", "general data protection regulation"],
+  ["kyc", "know your customer"],
+  ["aml", "anti-money laundering"],
+  ["sox", "sarbanes-oxley"],
+  ["dpo", "data protection officer"],
+  ["dpia", "data protection impact assessment"],
+  ["plc", "programmable logic controller"],
+  ["cnc", "computer numerical control"],
+  ["gmao", "gestion maintenance assistee ordinateur"],
+  ["wms", "warehouse management system"],
+  ["tms", "transportation management system"],
+  ["mes", "manufacturing execution system"],
+  ["cmms", "computerized maintenance management system"],
+  ["cad", "computer-aided design"],
+  ["cao", "conception assistee ordinateur"],
+  ["gpao", "gestion production assistee ordinateur"],
+  ["scada", "supervisory control data acquisition"],
+  ["mrp", "manufacturing resource planning"],
+  ["sea", "search engine advertising"],
+  ["cro", "conversion rate optimization"],
+  ["sem", "search engine marketing"],
+  ["ctr", "click through rate"],
+  ["cpc", "cost per click"],
+  ["roas", "return on ad spend"],
+  ["clv", "customer lifetime value"],
+  ["cac", "customer acquisition cost"],
+  ["lbo", "leveraged buy-out"],
+  ["m&a", "mergers and acquisitions"],
+  ["ipo", "initial public offering"],
+  ["dcf", "discounted cash flow"],
+  ["ebitda", "earnings before interest taxes depreciation amortization"],
+  ["irr", "internal rate of return"],
+  ["nav", "net asset value"],
+  ["p&l", "profit and loss"],
+  ["ide", "infirmier diplome etat"],
+  ["deas", "diplome etat aide soignant"],
+  ["ehpad", "etablissement hebergement personnes agees dependantes"],
+  ["samu", "service aide medicale urgente"],
+  ["smur", "structure mobile urgence reanimation"],
+  ["chu", "centre hospitalier universitaire"],
+  ["ars", "agence regionale sante"],
+  ["cpam", "caisse primaire assurance maladie"],
 ];
 
 // ── Synonymes / radicaux EN : "negotiation" ↔ "negotiated", etc. ──
@@ -856,6 +966,85 @@ const SYNONYMES_EN = {
   customer: ["client"], customers: ["clients", "client"],
   team: ["teams"], teams: ["team"],
 };
+
+// ── Synonymes Deep Research (clés/valeurs désaccentuées) ──────────
+const SYNONYMES_EXTRA_FR = {
+  "commercial": ["vente", "vendeur", "negoc", "ingenieur affaires", "prospection"],
+  "comptable": ["comptabilite", "compta", "tenue comptable", "expert-comptable", "aide-comptable", "facturation"],
+  "recruteur": ["talent acquisition", "sourcing", "recrutement", "chasseur tetes", "charge recrutement"],
+  "gestion": ["gerer", "gerant", "administrer", "pilotage", "supervision", "management"],
+  "direction": ["diriger", "directeur", "responsable", "executive", "head of", "manager"],
+  "ingenieur": ["ingenierie", "ingenieur etudes", "ingenieur methodes", "technique"],
+  "informaticien": ["developpeur", "programmation", "codeur", "ingenieur logiciel"],
+  "juriste": ["avocat", "conseil juridique", "clerc", "fiscaliste", "compliance"],
+  "logistique": ["supply chain", "transport", "entreposage", "stock", "approvisionnement", "flux"],
+  "achat": ["acheteur", "procurement", "approvisionneur", "sourcing", "negociateur"],
+  "vente": ["vendeur", "retail", "magasin", "boutique", "commercial"],
+  "accueil": ["reception", "standardiste", "hotesse", "accueil physique"],
+  "securite": ["gardiennage", "vigile", "rondier", "ssiap", "cnaps", "surete", "protection"],
+  "maintenance": ["gmao", "depannage", "entretien", "technicien", "preventif", "curatif"],
+  "analyse": ["analyste", "analyser", "audit", "controle", "reporting"],
+  "conseil": ["consultant", "conseiller", "consulting"],
+  "production": ["fabrication", "usine", "atelier", "chaine montage", "methodes"],
+  "communication": ["relations presse", "evenementiel", "community manager"],
+  "immobilier": ["negociateur immobilier", "agent immobilier", "syndic", "copropriete", "transaction"],
+  "banque": ["conseiller clientele", "charge affaires", "gestion patrimoine", "trader"],
+  "assurance": ["courtier", "souscripteur", "gestionnaire sinistres", "actuaire"],
+  "secretariat": ["assistant", "secretaire", "office manager", "administratif", "assistanat"],
+  "sante": ["infirmier", "medecin", "aide-soignant", "clinicien", "soins", "medical"],
+  "conception": ["concepteur", "dessinateur", "cao", "solidworks", "autocad", "catia"],
+  "technicien": ["technique", "operateur", "agent intervention"],
+  "expert": ["specialiste", "referent", "lead technique", "consultant senior"],
+  "recherche": ["r&d", "chercheur", "ingenieur recherche", "scientifique"],
+  "qualite": ["qse", "qhse", "hse", "animateur qualite", "controleur qualite"],
+  "administration": ["administrateur", "secretariat", "administratif", "assistanat"],
+  "negociation": ["negoci", "acheteur", "commercial", "closing"],
+  "deploiement": ["integration", "implementation", "installer", "parametrer"],
+  "optimisation": ["optimis", "amelioration continue", "lean", "kaizen", "performance"],
+  "audit": ["auditeur", "auditer", "commissaire comptes", "inspection", "controle interne"],
+  "formation": ["formateur", "e-learning", "enseignant", "pedagogie", "coaching"],
+};
+const SYNONYMES_EXTRA_EN = {
+  "procurement": ["purchasing", "sourcing", "buyer", "supply management"],
+  "developer": ["programmer", "coder", "software engineer", "tech lead"],
+  "recruiter": ["talent acquisition", "headhunter", "sourcing specialist"],
+  "marketing": ["online marketing", "web marketing", "growth hacking", "seo", "sem"],
+  "hr": ["human resources", "people operations", "talent management"],
+  "sales": ["sales rep", "account executive", "sales agent", "inside sales", "sold", "selling"],
+  "assistant": ["executive assistant", "personal assistant", "office manager", "admin"],
+  "analyst": ["business analyst", "data analyst", "bi analyst", "reporting"],
+  "support": ["customer support", "client partner", "customer care", "helpdesk"],
+  "testing": ["qa", "qa engineer", "test analyst", "software tester"],
+  "finance": ["finance analyst", "treasury", "fp&a", "budget analyst"],
+  "operations": ["ops manager", "operations director", "operations lead"],
+  "counsel": ["attorney", "solicitor", "barrister", "legal advisor", "general counsel"],
+  "compliance": ["compliance manager", "regulatory", "risk compliance"],
+  "risk": ["risk analyst", "credit risk", "market risk", "risk controller"],
+  "underwriting": ["underwrit", "insurance underwriter", "mortgage underwriter"],
+  "claims": ["claims handler", "claims adjuster", "claims analyst"],
+  "property": ["estate manager", "leasing", "facilities manager", "realtor"],
+  "security": ["security officer", "patrol officer", "loss prevention", "watchman", "guard"],
+  "machinist": ["cnc operator", "lathe operator", "mill operator"],
+  "welding": ["welder", "fabricator", "brazer", "welded"],
+  "automation": ["plc programmer", "controls engineer", "robotics", "automated"],
+  "warehouse": ["forklift", "material handler", "order picker", "picker packer"],
+  "warehousing": ["warehouse", "warehousing"],
+  "freight": ["shipping agent", "logistics coordinator", "export coordinator", "forwarder"],
+  "content": ["content writer", "copywriter", "creative writer", "copywriting"],
+  "social": ["community manager", "social editor", "social specialist"],
+  "advertising": ["ad ops", "media buyer", "media planner", "ads"],
+  "design": ["ui designer", "ux designer", "web designer", "front-end"],
+  "manager": ["managed", "managing", "management", "lead", "head of", "director"],
+  "coordination": ["coordinat", "organized", "scheduled"],
+  "implementation": ["implement", "deployed", "rolled out", "integrat"],
+  "improvement": ["improv", "optimiz", "streamlin", "enhanc"],
+};
+for (const [k, v] of Object.entries(SYNONYMES_EXTRA_FR)) {
+  SYNONYMES[k] = [...new Set([...(SYNONYMES[k] || []), ...v])];
+}
+for (const [k, v] of Object.entries(SYNONYMES_EXTRA_EN)) {
+  SYNONYMES_EN[k] = [...new Set([...(SYNONYMES_EN[k] || []), ...v])];
+}
 
 // Renvoie le mot-cle + toutes ses variantes (synonymes et formes de sigle)
 function variantesMotCle(mc) {
@@ -942,6 +1131,14 @@ const CONSEIL_SECTEUR = {
   btp: { fr: "Dans le BTP, mentionnez les types de chantiers, le budget piloté, les équipes encadrées, les normes maîtrisées (sécurité, environnement) et vos habilitations (CACES, électrique, etc.).", en: "In construction, mention the types of sites, budget managed, teams supervised, standards mastered (safety, environment) and your certifications (equipment, electrical, etc.)." },
   education: { fr: "En éducation/formation, précisez les publics formés, les volumes (nombre d'apprenants/heures), les méthodes pédagogiques et les résultats obtenus (taux de réussite, satisfaction).", en: "In education/training, specify the audiences taught, volumes (number of learners/hours), teaching methods and results achieved (pass rate, satisfaction)." },
   restauration: { fr: "En restauration, valorisez vos brigades, le type d'établissement (étoilé, brasserie, gastro), les normes HACCP et les volumes (couverts/jour). Le concret prime sur les diplômes.", en: "In hospitality, highlight your kitchen teams, the type of establishment (starred, brasserie, fine dining), HACCP standards and volumes (covers/day). Concrete facts matter more than diplomas." },
+  juridique: { fr: "Dans le juridique, précisez vos domaines de droit (contentieux, corporate, fiscalité), vos outils (LexisNexis, Kleos, Secib…) et vos qualifications (CAPA, DPO). La spécialisation est le premier critère scanné.", en: "In legal, specify your practice areas (litigation, corporate, tax), your tools (Relativity, Clio, LexisNexis…) and your qualifications (bar admission, LLM). Specialization is the first thing scanned." },
+  logistique: { fr: "En logistique, mentionnez vos systèmes (WMS, TMS), vos habilitations (CACES, ADR, Incoterms) et chiffrez les volumes gérés (références, expéditions/jour, taux de service).", en: "In logistics, list your systems (WMS, TMS), certifications (forklift, dangerous goods, Incoterms) and quantify volumes handled (SKUs, shipments/day, service rate)." },
+  marketing: { fr: "En marketing, affichez vos plateformes (Google Ads, GA4, HubSpot, Semrush), vos certifications et des résultats chiffrés (ROAS, taux de conversion, trafic généré). Les recruteurs veulent des preuves mesurables.", en: "In marketing, showcase your platforms (Google Ads, GA4, HubSpot, Semrush), certifications and quantified results (ROAS, conversion rate, traffic growth). Recruiters want measurable proof." },
+  industrie: { fr: "Dans l'industrie, précisez machines et logiciels maîtrisés (CAO, GMAO, automates), vos certifications (Six Sigma, ISO 9001) et chiffrez les gains (productivité, rebuts, temps de cycle).", en: "In manufacturing, specify machines and software mastered (CAD, CMMS, PLCs), certifications (Six Sigma, ISO 9001) and quantify gains (productivity, scrap rate, cycle time)." },
+  immobilier: { fr: "En immobilier, mentionnez vos cartes professionnelles (T, G), vos logiciels (Yardi, Hektor, Apimo…) et chiffrez votre activité (mandats, transactions, encours géré).", en: "In real estate, mention your licenses, software (Yardi, AppFolio, MRI…) and quantify your track record (listings, closings, portfolio under management)." },
+  assistanat: { fr: "En assistanat, listez vos outils précis (Cegid, Sage, Pennylane, TOSA certifié) et chiffrez vos volumes (agendas gérés, factures traitées/mois, langues pratiquées).", en: "In administrative support, list your specific tools (QuickBooks, Concur, MOS certified) and quantify volumes (calendars managed, invoices processed/month, languages)." },
+  banque: { fr: "En banque-assurance, affichez vos certifications (AMF, ORIAS, CFA), les réglementations maîtrisées (Bâle III, Solvabilité II, KYC) et chiffrez encours et portefeuilles gérés.", en: "In banking and insurance, display your licenses (CFA, Series 7, FRM), regulations mastered (Basel III, KYC/AML) and quantify assets and portfolios managed." },
+  securite: { fr: "En sécurité, vos cartes et diplômes (carte pro CNAPS, SSIAP, CQP APS) sont éliminatoires : mettez-les en première ligne, avec vos systèmes (Genetec, Milestone) et types de sites gardés.", en: "In security, licenses are dealbreakers (SIA licence, CPP/PSP, OSHA): put them first, along with your systems (Genetec, Milestone) and the types of sites protected." },
   default: { fr: "Adaptez votre CV à chaque offre : reprenez les mots-clés exacts utilisés dans l'annonce, chiffrez vos réalisations et placez en premier les expériences les plus pertinentes pour le poste visé.", en: "Tailor your résumé to each job: reuse the exact keywords from the posting, quantify your achievements, and put the most relevant experience for the target role first." },
 };
 
@@ -1768,6 +1965,7 @@ function HeroEtapeCard({ etape }) {
 // ── Accueil mobile : écran de bienvenue plein écran, fermable d'une croix ──
 function HeroOverlayMobile({ onClose }) {
   const T = useT();
+  const { lang } = useLang();
   return (
     <div className="hero-overlay" style={{
       position: "fixed", inset: 0, zIndex: 5000,
@@ -1781,9 +1979,19 @@ function HeroOverlayMobile({ onClose }) {
       <div style={{ width: "100%", maxWidth: "480px", margin: "0 auto" }}>
         {/* Barre du haut : marque + croix pour entrer dans l'application */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "22px" }}>
-          <span style={{ fontFamily: FONT_SERIF, fontWeight: 700, fontSize: "22px", color: C.primary }}>
-            Recrutable
-          </span>
+          <div>
+            <span style={{ fontFamily: FONT_SERIF, fontWeight: 700, fontSize: "22px", color: C.primary }}>
+              Recrutable
+            </span>
+            {lang === "en" && (
+              <div style={{
+                fontSize: "11px", fontWeight: 700, color: C.accent,
+                letterSpacing: "0.16em", textTransform: "uppercase", fontFamily: FONT_SANS,
+              }}>
+                Hirable
+              </div>
+            )}
+          </div>
           <button
             onClick={onClose}
             aria-label={T("Fermer l'écran de bienvenue et commencer", "Close the welcome screen and start")}
@@ -2003,6 +2211,16 @@ function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
           }}>
             Recrutable
           </h1>
+          {/* Sous-marque anglophone : visible uniquement en mode EN */}
+          {lang === "en" && (
+            <div style={{
+              margin: "1px 0 0", fontSize: "12.5px", fontWeight: 700,
+              color: C.accent, letterSpacing: "0.16em", textTransform: "uppercase",
+              fontFamily: FONT_SANS,
+            }}>
+              Hirable
+            </div>
+          )}
           <p className="app-header-tagline" style={{
             margin: "4px 0 0", fontSize: "15px", color: C.textSecondary,
             fontFamily: FONT_SANS, fontWeight: 400,

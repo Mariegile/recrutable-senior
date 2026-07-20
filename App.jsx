@@ -825,6 +825,20 @@ function detecterSecteur(texteOffre, texteCV) {
 
 // ── Extraire les mots-clés importants de l'offre ──────────────────
 function extraireMotsCles(texteOffre, secteur) {
+  // 1) N-grams : les expressions multi-mots connues présentes dans l'offre
+  //    sont les mots-clés les plus fiables (ex : "gestion de projet").
+  const offreNorm = texteOffre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const langueOffre = detecterLangueTexte(texteOffre);
+  const listeNgrams = langueOffre === "en" ? NGRAMS_EN : NGRAMS_FR;
+  const ngramsTrouves = [];
+  for (const ng of listeNgrams) {
+    if (ngramsTrouves.length >= 6) break;
+    const rx = new RegExp(`\\b${ng.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i");
+    if (rx.test(offreNorm)) ngramsTrouves.push(ng);
+  }
+  // Les mots composant un n-gram retenu ne doivent pas re-compter en unigram
+  const motsDejaCouverts = new Set(ngramsTrouves.flatMap(ng => ng.split(/\s+/)));
+
   const tokens = tokeniser(texteOffre);
   const freq = {};
   for (const t of tokens) {
@@ -838,12 +852,13 @@ function extraireMotsCles(texteOffre, secteur) {
   for (const mc of motsCleSecteur) {
     if (freq[mc]) freq[mc] += 3;  // boost
   }
-  // Tri par fréquence + bonus
+  // Tri par fréquence + bonus, en excluant les mots déjà couverts par un n-gram
   const triés = Object.entries(freq)
     .sort((a, b) => b[1] - a[1])
     .map(([mot]) => mot)
-    .filter(m => m.length >= 4 && !/^\d+$/.test(m));
-  return triés.slice(0, 15);  // top 15 mots-clés
+    .filter(m => m.length >= 4 && !/^\d+$/.test(m) && !motsDejaCouverts.has(m));
+  // N-grams en tête (mots-clés forts), complétés par les unigrams
+  return [...ngramsTrouves, ...triés].slice(0, 15);
 }
 
 // ── Comparer CV vs offre : mots présents / manquants ──────────────
@@ -1073,6 +1088,139 @@ function comparerMotsCles(motsCles, texteCV) {
   return { presents: presents.slice(0, 10), manquants: manquants.slice(0, 10) };
 }
 
+// ═══════════════════════════════════════════════════════════════════
+//   GRAMMAIRE DES CV (Deep Research) : sections, dates, n-grams
+//   Tout est stocké désaccentué : le moteur compare en désaccentué.
+// ═══════════════════════════════════════════════════════════════════
+const SECTIONS_CV_HEADERS = {
+  experience: [...["experience", "experience professionnelle", "parcours professionnel", "experiences", "experiences professionnelles", "mon parcours", "experience en entreprise", "postes occupes", "historique professionnel", "carriere", "antecedents professionnels", "experience pertinente", "parcours"], ...["experience", "work experience", "professional experience", "employment history", "career history", "professional background", "work history", "employment", "professional history", "career progression", "relevant experience", "professional employment", "career overview"]],
+  formation: [...["formation", "etudes", "parcours academique", "education", "diplomes", "formation academique", "formations et diplomes", "cursus", "cursus academique", "bagage academique", "scolarite"], ...["education", "academic background", "academic history", "educational background", "education and training", "formal qualifications", "academic training", "academic achievements", "studies", "educational history"]],
+  competences: [...["competences", "expertises", "domaines d'expertise", "savoir-faire", "competences cles", "competences professionnelles", "competences techniques", "hard skills", "soft skills", "atouts", "competences informatiques", "aptitudes"], ...["skills", "core competencies", "areas of expertise", "technical skills", "key skills", "professional skills", "hard skills", "soft skills", "competencies", "skills profile"]],
+  langues: [...["langues", "langues vivantes", "competences linguistiques", "niveaux de langue", "langues etrangeres", "langues parlees"], ...["languages", "language skills", "foreign languages", "language proficiency", "spoken languages"]],
+  certifications: [...["certifications", "diplomes et certifications", "habilitations", "accreditations", "certificats", "formations complementaires", "certifications professionnelles"], ...["certifications", "licenses and certifications", "accreditations", "certificates", "professional certifications", "credentials", "professional development"]],
+  projets: [...["projets", "projets academiques", "projets techniques", "projets personnels", "portfolio", "projets informatiques", "projets d'etudes"], ...["projects", "academic projects", "technical projects", "personal projects", "portfolio", "key projects", "research projects"]],
+  profil: [...["a propos", "profil", "resume", "objectif", "presentation", "synthese", "a propos de moi", "profil professionnel", "objectif professionnel", "synthese professionnelle"], ...["summary", "objective", "about me", "profile", "professional summary", "career objective", "personal statement", "executive summary", "professional profile", "overview"]],
+  interets: [...["centres d'interet", "loisirs", "hobbies", "activites extra-professionnelles", "passions", "interets", "vie associative", "divers"], ...["interests", "hobbies", "extracurricular activities", "hobbies and interests", "personal interests", "volunteer experience", "activities"]],
+};
+const NGRAMS_FR = ["gestion de projet", "relation client", "conduite du changement", "appel d'offres", "gestion budgetaire", "analyse de donnees", "veille strategique", "amelioration continue", "force de proposition", "strategie commerciale", "gestion d'equipe", "prise de decision", "resolution de problemes", "gestion du temps", "planification strategique", "gestion des risques", "developpement commercial", "negociation commerciale", "marketing digital", "gestion des stocks", "ressources humaines", "administration des ventes", "pilotage de performance", "gestion de crise", "communication interne", "communication externe", "relations publiques", "analyse financiere", "controle de gestion", "gestion de tresorerie", "optimisation des processus", "audit interne", "gestion des conflits", "intelligence economique", "gestion relation client", "service apres-vente", "gestion des fournisseurs", "pilotage operationnel", "transformation digitale", "marketing de contenu", "gestion de produit", "experience utilisateur", "gestion des talents", "developpement international", "gestion des achats", "gestion de communaute", "securite de l'information", "developpement de partenariats", "gestion des operations", "pilotage de projet", "gestion administrative", "developpement de logiciels", "developpement durable", "conformite reglementaire", "analyse de marche", "gestion logistique", "developpement des competences", "conduite de reunion", "ingenierie de formation", "gestion documentaire", "genie logiciel", "systeme d'information", "conception de produit", "assurance qualite", "controle qualite", "intelligence artificielle", "science des donnees", "recherche et developpement"];
+const NGRAMS_EN = ["project management", "stakeholder management", "data analysis", "account management", "budget forecasting", "change management", "strategic planning", "risk management", "business development", "process optimization", "customer relationship", "continuous improvement", "vendor management", "digital marketing", "conflict resolution", "content strategy", "brand management", "financial analysis", "performance management", "market research", "product management", "operations management", "digital transformation", "human resources", "social media", "customer service", "supply chain", "quality assurance", "lead generation", "contract negotiation", "inventory management", "crisis management", "public relations", "event planning", "team leadership", "resource allocation", "time management", "asset management", "talent acquisition", "sales strategy", "client relations", "business intelligence", "regulatory compliance", "user experience", "internal communications", "technical support", "performance tracking", "information security", "cost reduction", "database management", "relationship building", "agile methodology", "budget management", "executive support", "partnership development", "revenue growth", "product launch", "campaign management", "community management", "strategic sourcing", "financial reporting", "quality control", "knowledge management", "decision making", "project delivery", "document control", "problem solving", "customer onboarding", "search engine optimization", "market analysis", "risk assessment", "media relations", "operations planning"];
+const MARQUEURS_ACTUEL = [...["aujourd'hui", "present", "en cours", "a ce jour", "actuel", "maintenant", "poste actuel"], ...["present", "current", "ongoing", "to date", "now", "present day", "current position"]];
+
+const MOIS_MAP = {
+  janvier:1, janv:1, january:1, jan:1, fevrier:2, fev:2, february:2, feb:2,
+  mars:3, march:3, mar:3, avril:4, avr:4, april:4, apr:4, mai:5, may:5,
+  juin:6, june:6, jun:6, juillet:7, juil:7, july:7, jul:7, aout:8, august:8, aug:8,
+  septembre:9, sept:9, september:9, sep:9, octobre:10, october:10, oct:10,
+  novembre:11, november:11, nov:11, decembre:12, december:12, dec:12,
+};
+const MOIS_RX = Object.keys(MOIS_MAP).sort((a,b)=>b.length-a.length).join("|");
+
+// ── Détection des sections présentes dans le CV ────────────────────
+// Une ligne courte qui correspond à un intitulé connu = en-tête de section.
+function detecterSectionsCV(texteCV) {
+  const lignes = texteCV.split(/\n/);
+  const presentes = new Set();
+  const sectionParLigne = [];
+  let courante = null;
+  for (const ligne of lignes) {
+    const l = ligne.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[:•·\-–—*#]/g, " ").replace(/\s+/g, " ").trim();
+    if (l.length > 0 && l.length <= 40) {
+      for (const [sec, variantes] of Object.entries(SECTIONS_CV_HEADERS)) {
+        if (variantes.includes(l)) { presentes.add(sec); courante = sec; break; }
+      }
+    }
+    sectionParLigne.push(courante);
+  }
+  return { presentes, sectionParLigne, lignes };
+}
+
+// ── Chronologie : intervalles d'emploi, années d'expérience, trous ──
+// N'analyse que les lignes hors sections formation/projets/intérêts
+// (les dates de diplômes ne comptent pas comme expérience).
+function extraireChronologie(texteCV) {
+  const { sectionParLigne, lignes } = detecterSectionsCV(texteCV);
+  const EXCLUES = new Set(["formation", "projets", "interets", "certifications"]);
+  const maintenant = new Date();
+  const NOW = maintenant.getFullYear() * 12 + (maintenant.getMonth() + 1);
+  const marqueurActuel = MARQUEURS_ACTUEL.map(m => m.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const M = `(?:${MOIS_RX})`;
+  const SEP = "\\s*(?:-|–|—|a|au|to|jusqu'a)\\s*";
+  const rxs = [
+    // 01/2020 - 03/2022  |  01/2020 - aujourd'hui
+    new RegExp(`(\\d{1,2})[\\/.\\-](\\d{4})${SEP}(?:(\\d{1,2})[\\/.\\-](\\d{4})|(${marqueurActuel}))`, "g"),
+    // janvier 2020 - decembre 2022  |  jan. 2020 - present
+    new RegExp(`(${M})\\.?\\s+(\\d{4})${SEP}(?:(${M})\\.?\\s+(\\d{4})|(${marqueurActuel}))`, "g"),
+    // 2019 - 2023  |  2019 - aujourd'hui   (granularité annuelle)
+    new RegExp(`\\b(\\d{4})${SEP}(?:(\\d{4})\\b|(${marqueurActuel}))`, "g"),
+    // depuis 2021 | since jan 2022
+    new RegExp(`(?:depuis|since)\\s+(?:(${M})\\.?\\s+)?(\\d{4})`, "g"),
+  ];
+  const intervalles = [];
+  const okAnnee = (a) => a >= 1970 && a <= maintenant.getFullYear() + 1;
+  for (let i = 0; i < lignes.length; i++) {
+    if (EXCLUES.has(sectionParLigne[i])) continue;
+    const l = lignes[i].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    let m;
+    // Format numérique MM/YYYY
+    rxs[0].lastIndex = 0;
+    while ((m = rxs[0].exec(l))) {
+      const a1 = +m[2]; if (!okAnnee(a1)) continue;
+      const debut = a1 * 12 + Math.min(12, Math.max(1, +m[1]));
+      const fin = m[5] ? NOW : (okAnnee(+m[4]) ? (+m[4]) * 12 + Math.min(12, Math.max(1, +m[3])) : null);
+      if (fin && fin >= debut) intervalles.push({ debut, fin, annuel: false, ouvert: !!m[5] });
+    }
+    // Mois en lettres
+    rxs[1].lastIndex = 0;
+    while ((m = rxs[1].exec(l))) {
+      const a1 = +m[2]; if (!okAnnee(a1)) continue;
+      const debut = a1 * 12 + (MOIS_MAP[m[1]] || 1);
+      const fin = m[5] ? NOW : (okAnnee(+m[4]) ? (+m[4]) * 12 + (MOIS_MAP[m[3]] || 12) : null);
+      if (fin && fin >= debut) intervalles.push({ debut, fin, annuel: false, ouvert: !!m[5] });
+    }
+    // Années seules (si pas déjà capté un format précis sur cette ligne)
+    if (!/\d{1,2}[\/.\-]\d{4}/.test(l) && !new RegExp(`(${M})\\.?\\s+\\d{4}`).test(l)) {
+      rxs[2].lastIndex = 0;
+      while ((m = rxs[2].exec(l))) {
+        const a1 = +m[1]; if (!okAnnee(a1)) continue;
+        const debut = a1 * 12 + 1;
+        const fin = m[3] ? NOW : (okAnnee(+m[2]) ? (+m[2]) * 12 + 12 : null);
+        if (fin && fin >= debut && fin - debut <= 50 * 12) intervalles.push({ debut, fin, annuel: true, ouvert: !!m[3] });
+      }
+      rxs[3].lastIndex = 0;
+      while ((m = rxs[3].exec(l))) {
+        const a1 = +m[2]; if (!okAnnee(a1)) continue;
+        const debut = a1 * 12 + (m[1] ? (MOIS_MAP[m[1]] || 1) : 1);
+        intervalles.push({ debut, fin: NOW, annuel: !m[1], ouvert: true });
+      }
+    }
+  }
+  if (!intervalles.length) return { anneesExperience: null, trous: [], granulariteAnnuelle: false };
+  // Fusion des intervalles qui se chevauchent
+  intervalles.sort((x, y) => x.debut - y.debut);
+  const fusionnes = [];
+  for (const it of intervalles) {
+    const dernier = fusionnes[fusionnes.length - 1];
+    if (dernier && it.debut <= dernier.fin + 1) {
+      dernier.fin = Math.max(dernier.fin, it.fin);
+      dernier.annuel = dernier.annuel || it.annuel;
+    } else fusionnes.push({ ...it });
+  }
+  const totalMois = fusionnes.reduce((s, it) => s + (it.fin - it.debut + 1), 0);
+  // Trous entre deux périodes (fiable seulement en granularité mensuelle)
+  const trous = [];
+  for (let i = 1; i < fusionnes.length; i++) {
+    const ecart = fusionnes[i].debut - fusionnes[i - 1].fin - 1;
+    if (ecart > 6 && !fusionnes[i].annuel && !fusionnes[i - 1].annuel) trous.push(ecart);
+  }
+  return {
+    anneesExperience: Math.round((totalMois / 12) * 10) / 10,
+    trous,
+    granulariteAnnuelle: fusionnes.some(it => it.annuel),
+  };
+}
+
+
 // ── Détecter les points forts/faibles structurels du CV ───────────
 function detecterPointsForts(texteCV) {
   const points = [];
@@ -1095,7 +1243,23 @@ function detecterPointsForts(texteCV) {
   if (dates && dates.length >= 4) points.push(tg("Parcours daté et structuré dans le temps", "Career history dated and structured over time"));
   // Email/téléphone
   if (/[\w.+-]+@[\w-]+\.[\w.-]+/.test(texteCV)) points.push(tg("Coordonnées de contact clairement indiquées", "Contact details clearly stated"));
-  return points.slice(0, 4);
+  // Années d'expérience détectées via la chronologie
+  try {
+    const chrono = extraireChronologie(texteCV);
+    if (chrono.anneesExperience && chrono.anneesExperience >= 2) {
+      points.push(tg(`${chrono.anneesExperience} années d'expérience détectées, parcours daté et vérifiable`,
+                     `${chrono.anneesExperience} years of experience detected, dated and verifiable career path`));
+    }
+  } catch {}
+  // Structure : sections clés présentes
+  try {
+    const { presentes } = detecterSectionsCV(texteCV);
+    if (presentes.has("competences") && presentes.has("experience") && presentes.has("formation")) {
+      points.push(tg("CV bien structuré : sections Expérience, Formation et Compétences repérées",
+                     "Well-structured résumé: Experience, Education and Skills sections detected"));
+    }
+  } catch {}
+  return points.slice(0, 5);
 }
 
 function detecterPointsFaibles(texteCV) {
@@ -1118,7 +1282,39 @@ function detecterPointsFaibles(texteCV) {
   if (nbVerbesAction < 5) points.push(tg("Peu de verbes d'action : privilégiez 'piloté', 'augmenté', 'optimisé'…", "Few action verbs: prefer 'led', 'increased', 'optimized'…"));
   // Pas d'email
   if (!/[\w.+-]+@[\w-]+\.[\w.-]+/.test(texteCV)) points.push(tg("Email de contact manquant ou difficile à repérer", "Contact email missing or hard to spot"));
-  return points.slice(0, 4);
+  const langueCVDetectee = detecterLangueTexte(texteCV);
+  // Sections manquantes (seuil : CV assez long pour en avoir)
+  try {
+    const { presentes } = detecterSectionsCV(texteCV);
+    if (texteCV.length > 900) {
+      if (!presentes.has("competences")) points.push(tg("Aucune rubrique « Compétences » repérée : les ATS la cherchent explicitement", "No “Skills” section detected: ATS software looks for it explicitly"));
+      else if (!presentes.has("formation")) points.push(tg("Aucune rubrique « Formation » repérée", "No “Education” section detected"));
+    }
+  } catch {}
+  // Trous de carrière > 6 mois (fiable uniquement en dates mensuelles)
+  try {
+    const chrono = extraireChronologie(texteCV);
+    if (chrono.trous.length > 0) {
+      const mois = Math.max(...chrono.trous);
+      points.push(tg(`Trou de carrière visible (~${mois} mois) : ajoutez formation, projet ou mission sur cette période`,
+                     `Visible career gap (~${mois} months): add training, a project or freelance work covering that period`));
+    }
+  } catch {}
+  // Pronoms personnels (pénalisant surtout en anglais)
+  if (langueCVDetectee === "en") {
+    const pronoms = (texteCV.match(/\b(I|my|we|our)\b/g) || []).length;
+    if (pronoms >= 2) points.push(tg("Pronoms personnels (I, my, we) : les CV anglophones s'écrivent sans pronom, verbe d'action en tête", "Personal pronouns (I, my, we): English résumés drop pronouns — start bullets with action verbs"));
+    const perso = /\b(date of birth|marital status|years old)\b/i.test(texteCV);
+    if (perso) points.push(tg("Données personnelles (âge, situation familiale) : à supprimer absolument pour les ATS US/UK", "Personal data (age, marital status): remove entirely for US/UK ATS compliance"));
+  } else {
+    const jeCount = (texteCV.match(/\b(je|j'ai|mon|ma|mes)\b/gi) || []).length;
+    if (jeCount >= 4) points.push(tg("Beaucoup de « je / mon » : préférez des puces commençant par un verbe d'action, sans pronom", "Many first-person pronouns: prefer bullets starting with an action verb, no pronoun"));
+  }
+  // Puces trop longues (> ~2 lignes)
+  const puces = texteCV.split(/\n/).filter(l => /^\s*[•·\-–—*▪]/.test(l));
+  const pucesLongues = puces.filter(l => l.trim().length > 220).length;
+  if (pucesLongues >= 2) points.push(tg("Des puces dépassent 2 lignes : elles deviennent des paragraphes que les recruteurs ne lisent pas", "Some bullets exceed 2 lines: they turn into paragraphs recruiters skip"));
+  return points.slice(0, 5);
 }
 
 // ── Conseils génériques par secteur (au lieu d'un conseil IA) ─────

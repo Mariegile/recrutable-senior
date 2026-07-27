@@ -68,8 +68,17 @@ const STRIPE_RECHARGE = "https://buy.stripe.com/cNicN61jGf0hg8ecL5eEo05"; // 2,9
 
 // Force la langue de la page de paiement Stripe pour qu'elle suive
 // l'onglet FR/EN de l'app (sinon Stripe se base sur le navigateur).
+// SÉCURITÉ/FIABILITÉ : on transmet aussi l'identité du compte connecté
+// (client_reference_id + e-mail pré-rempli) pour que le webhook crédite
+// le BON compte même si l'e-mail saisi dans Stripe diffère.
+let CURRENT_USER = null; // { id, email } — mis à jour par App à chaque changement de session
 function stripeUrl(base) {
-  return `${base}?locale=${CURRENT_LANG === "en" ? "en" : "fr"}`;
+  let url = `${base}?locale=${CURRENT_LANG === "en" ? "en" : "fr"}`;
+  if (CURRENT_USER?.id) {
+    url += `&client_reference_id=${encodeURIComponent(CURRENT_USER.id)}`;
+    if (CURRENT_USER.email) url += `&prefilled_email=${encodeURIComponent(CURRENT_USER.email)}`;
+  }
+  return url;
 }
 const SUPPORT_EMAIL   = "metamax973@gmail.com";
 
@@ -389,7 +398,10 @@ async function analyserPdf(file) {
   const sig = new Uint8Array(buf.slice(0, 4));
   if (sig[0] !== 0x25 || sig[1] !== 0x50 || sig[2] !== 0x44 || sig[3] !== 0x46)
     throw new Error("Ce fichier n'est pas un vrai PDF.");
-  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+  // SÉCURITÉ (CVE-2024-4367) : isEvalSupported:false neutralise l'exécution
+  // de JavaScript arbitraire via une police piégée dans un PDF malveillant.
+  // (À terme : migrer pdf.js vers ≥ 4.2.67, build ES module.)
+  const pdf = await pdfjs.getDocument({ data: buf, isEvalSupported: false }).promise;
   let totalText = "";
   let aPhoto = false;
 
@@ -425,15 +437,25 @@ async function analyserPdf(file) {
 //   API — Streaming SSE
 // ═══════════════════════════════════════════════════════════════════
 
-const MODEL_SONNET = "claude-sonnet-4-6";
-const MODEL_OPUS   = "claude-opus-4-6";
+// SÉCURITÉ : le client n'envoie plus JAMAIS de prompt, de modèle ni de
+// max_tokens. Il envoie { action, payload } + le jeton de session Supabase ;
+// prompts, modèles, quotas et débit de crédits vivent CÔTÉ SERVEUR
+// (netlify/functions/claude.js, claude-stream.js, _securite.js).
 
-async function callClaudeStream(system, userText, maxTokens = 800, model = MODEL_SONNET, onChunk) {
+async function enTetesAuth() {
+  const { data } = await supabase.auth.getSession();
+  const jwt = data?.session?.access_token;
+  if (!jwt) throw new Error(tg("Connectez-vous pour utiliser cette fonction.", "Log in to use this feature."));
+  return { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` };
+}
+
+async function callClaudeStream(action, payload, onChunk) {
   checkRateLimit();
+  const headers = await enTetesAuth();
   const res = await fetch("/.netlify/functions/claude-stream", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, max_tokens: maxTokens, system, userText }),
+    headers,
+    body: JSON.stringify({ action, payload }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -462,20 +484,23 @@ async function callClaudeStream(system, userText, maxTokens = 800, model = MODEL
   return fullText;
 }
 
-async function callClaude(system, userText, maxTokens = 800, model = MODEL_SONNET) {
+// Renvoie { text, credits } — credits est le nouveau solde si l'action en a
+// débité un côté serveur (null sinon).
+async function callClaude(action, payload) {
   checkRateLimit();
+  const headers = await enTetesAuth();
   const res = await fetch("/.netlify/functions/claude", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model, max_tokens: maxTokens, system,
-      messages: [{ role: "user", content: [{ type: "text", text: userText }] }],
-    }),
+    headers,
+    body: JSON.stringify({ action, payload }),
   });
   let data;
   try { data = await res.json(); } catch { throw new Error(tg("Réponse du serveur illisible. Réessayez.", "Unreadable server response. Please try again.")); }
   if (!res.ok) throw new Error(data?.error?.message || `Erreur de connexion (code ${res.status})`);
-  return data.content?.map(b => b.text || "").join("") || "";
+  return {
+    text: data.content?.map(b => b.text || "").join("") || "",
+    credits: typeof data.credits === "number" ? data.credits : null,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -4670,9 +4695,13 @@ export default function App() {
     const { data } = await supabase.from("profils").select("credits").eq("id", s.user.id).single();
     if (data) setCredits(data.credits);
   };
+  // Tient à jour l'identité utilisée par stripeUrl() (crédit du bon compte).
+  const majUtilisateurCourant = (s) => {
+    CURRENT_USER = s?.user ? { id: s.user.id, email: s.user.email || "" } : null;
+  };
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); chargerCredits(data.session); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => { setSession(s); chargerCredits(s); });
+    supabase.auth.getSession().then(({ data }) => { setSession(data.session); majUtilisateurCourant(data.session); chargerCredits(data.session); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => { setSession(s); majUtilisateurCourant(s); chargerCredits(s); });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -4799,8 +4828,14 @@ export default function App() {
         envelopper("MOTS_CLES", analyse?.motsManquants?.join(", ") || ""),
       ].filter(Boolean).join("\n\n");
 
-      // Le CV est généré en JSON structuré : on attend la réponse complète avant de parser
-      const raw = await callClaude(PROMPT_REWRITE, userText, 2500, MODEL_OPUS);
+      // Le CV est généré en JSON structuré : on attend la réponse complète avant de parser.
+      // SÉCURITÉ : le serveur vérifie le compte, débite le crédit ATOMIQUEMENT
+      // AVANT l'appel IA (et rembourse si l'IA échoue). Plus aucun débit côté client.
+      const { text: raw, credits: soldeServeur } = await callClaude("rewrite", {
+        cv: cvContent,
+        offre: offreContent,
+        motsCles: analyse?.motsManquants?.join(", ") || "",
+      });
       if (!raw?.trim()) throw new Error(T("Réponse vide. Réessayez s'il vous plaît.", "Empty response. Please try again."));
       let cv;
       try {
@@ -4828,8 +4863,9 @@ export default function App() {
         if (typeof cv.nouveauScore === "number") scoreReecrit = cv.nouveauScore;
       }
       setScoreOptimise(Math.max(scoreReecrit, ancienScore));
-      const { data: soldeApres, error: errDep } = await supabase.rpc("depenser_credit", { montant: CREDITS.REWRITE });
-      if (!errDep && typeof soldeApres === "number") setCredits(soldeApres);
+      // Le débit a déjà eu lieu côté serveur : on affiche le solde renvoyé.
+      if (typeof soldeServeur === "number") setCredits(soldeServeur);
+      else chargerCredits(session);
       setPaid(true); // le credit depense pour la reecriture debloque le dossier (telechargement + copie + lettre)
     } catch (err) {
       setCvOptError(err.message || T("Erreur inattendue durant la réécriture.", "Unexpected error during the rewrite."));
@@ -4846,8 +4882,7 @@ export default function App() {
     if (traduisant || !source) return;
     setTraduisant(true); setTraductionError("");
     try {
-      const userText = envelopper("CV_JSON", JSON.stringify(source));
-      const raw = await callClaude(PROMPT_TRADUCTION, userText, 2500, MODEL_SONNET);
+      const { text: raw } = await callClaude("traduction", { cvJson: JSON.stringify(source) });
       if (!raw?.trim()) throw new Error(T("Réponse vide. Réessayez s'il vous plaît.", "Empty response. Please try again."));
       let cvEn;
       try {
@@ -4893,27 +4928,26 @@ export default function App() {
 
       // Interface anglaise : lettre EN ANGLAIS, basée sur le CV anglais
       // s'il existe (sinon le CV français, Claude gère la transition).
+      // Le prompt (et la règle de langue) vivent désormais CÔTÉ SERVEUR.
       const lettreEnAnglais = lang === "en";
       const cvSource = (lettreEnAnglais && cvEnAnglais) ? cvEnAnglais : (cvEdite || cvOpt);
-      const promptLettre = lettreEnAnglais
-        ? PROMPT_LETTRE + "\n\nREGLE DE LANGUE ABSOLUE : redige la lettre ENTIEREMENT EN ANGLAIS professionnel (cover letter, marche americain/international) : ton direct, verbes d action, aucune tournure traduite litteralement du francais, salutations et formule de politesse anglophones (Dear Hiring Manager..., Sincerely)."
-        : PROMPT_LETTRE;
-
-      const userText = [
-        envelopper("CV", cvSource ? cvVersTexte(cvSource) : ""),
-        envelopper("FICHE_POSTE", offreContent),
-      ].filter(Boolean).join("\n\n");
+      const payloadLettre = {
+        cv: cvSource ? cvVersTexte(cvSource) : "",
+        offre: offreContent,
+        lang: lettreEnAnglais ? "en" : "fr",
+      };
 
       let result = "";
       try {
-        result = await callClaudeStream(promptLettre, userText, 700, MODEL_SONNET, (partial) => setLettre(partial));
+        result = await callClaudeStream("lettre", payloadLettre, (partial) => setLettre(partial));
       } catch {
-        result = await callClaude(promptLettre, userText, 700, MODEL_SONNET);
+        result = (await callClaude("lettre", payloadLettre)).text;
         setLettre(result);
       }
       if (!result?.trim() || result.trim().length < 100) throw new Error(T("La réponse est trop courte. Réessayez s'il vous plaît.", "The response is too short. Please try again."));
       setLettreOriginale(result); // sauvegarde pour permettre de "Revenir à l'original"
-      setCredits(depenseCredits(CREDITS.LETTRE));
+      // (Plus de débit localStorage ici : la lettre est incluse dans le crédit
+      //  du dossier, et l'ancienne ligne écrasait l'affichage du solde serveur.)
     } catch (err) {
       setLettreError(err.message || T("Erreur inattendue durant la rédaction.", "Unexpected error while writing."));
     }
@@ -4979,8 +5013,11 @@ export default function App() {
 
   const doPivot = async () => {
     if (pivotLoading) return;
-    if (credits < CREDITS.PIVOT) {
-      setPivotError(T(`Il vous faut 1 action IA pour les pistes de reconversion. Achetez la recharge à 2,99 €.`, `You need 1 AI action for the career-change options. Buy the top-up at €2.99.`));
+    // SÉCURITÉ : cette action IA a un coût API réel — compte obligatoire
+    // (le serveur l'exige de toute façon, et applique un quota journalier).
+    if (!session) {
+      setShowAuth(true);
+      setPivotError(T("Connectez-vous pour découvrir vos pistes de reconversion.", "Log in to see your career-change options."));
       return;
     }
     setPivotLoading(true); setPivotError(""); setPivots(null);
@@ -4989,11 +5026,9 @@ export default function App() {
       if (cvPdfInfo?.texte && !cvPdfInfo.estPhoto) cvContent = limiterTexte(cvPdfInfo.texte, LIMITS.CV_MAX).texte;
       else if (cvText) cvContent = limiterTexte(cvText, LIMITS.CV_MAX).texte;
 
-      const userText = envelopper("CV_CANDIDAT", cvContent);
-      const raw = await callClaude(PROMPT_PIVOT, userText, 700, MODEL_SONNET);
+      const { text: raw } = await callClaude("pivot", { cv: cvContent });
       const parsed = validerPivot(raw);
       setPivots(parsed);
-      setCredits(depenseCredits(CREDITS.PIVOT));
     } catch (err) {
       setPivotError(err.message || T("Erreur lors de l'analyse de reconversion.", "Error during the career-change analysis."));
     }

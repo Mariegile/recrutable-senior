@@ -68,8 +68,17 @@ const STRIPE_RECHARGE = "https://buy.stripe.com/cNicN61jGf0hg8ecL5eEo05"; // 2,9
 
 // Force la langue de la page de paiement Stripe pour qu'elle suive
 // l'onglet FR/EN de l'app (sinon Stripe se base sur le navigateur).
+// SÉCURITÉ/FIABILITÉ : on transmet aussi l'identité du compte connecté
+// (client_reference_id + e-mail pré-rempli) pour que le webhook crédite
+// le BON compte même si l'e-mail saisi dans Stripe diffère.
+let CURRENT_USER = null; // { id, email } — mis à jour par App à chaque changement de session
 function stripeUrl(base) {
-  return `${base}?locale=${CURRENT_LANG === "en" ? "en" : "fr"}`;
+  let url = `${base}?locale=${CURRENT_LANG === "en" ? "en" : "fr"}`;
+  if (CURRENT_USER?.id) {
+    url += `&client_reference_id=${encodeURIComponent(CURRENT_USER.id)}`;
+    if (CURRENT_USER.email) url += `&prefilled_email=${encodeURIComponent(CURRENT_USER.email)}`;
+  }
+  return url;
 }
 const SUPPORT_EMAIL   = "metamax973@gmail.com";
 
@@ -389,7 +398,10 @@ async function analyserPdf(file) {
   const sig = new Uint8Array(buf.slice(0, 4));
   if (sig[0] !== 0x25 || sig[1] !== 0x50 || sig[2] !== 0x44 || sig[3] !== 0x46)
     throw new Error("Ce fichier n'est pas un vrai PDF.");
-  const pdf = await pdfjs.getDocument({ data: buf }).promise;
+  // SÉCURITÉ (CVE-2024-4367) : isEvalSupported:false neutralise l'exécution
+  // de JavaScript arbitraire via une police piégée dans un PDF malveillant.
+  // (À terme : migrer pdf.js vers ≥ 4.2.67, build ES module.)
+  const pdf = await pdfjs.getDocument({ data: buf, isEvalSupported: false }).promise;
   let totalText = "";
   let aPhoto = false;
 
@@ -425,15 +437,25 @@ async function analyserPdf(file) {
 //   API — Streaming SSE
 // ═══════════════════════════════════════════════════════════════════
 
-const MODEL_SONNET = "claude-sonnet-4-6";
-const MODEL_OPUS   = "claude-opus-4-6";
+// SÉCURITÉ : le client n'envoie plus JAMAIS de prompt, de modèle ni de
+// max_tokens. Il envoie { action, payload } + le jeton de session Supabase ;
+// prompts, modèles, quotas et débit de crédits vivent CÔTÉ SERVEUR
+// (netlify/functions/claude.js, claude-stream.js, _securite.js).
 
-async function callClaudeStream(system, userText, maxTokens = 800, model = MODEL_SONNET, onChunk) {
+async function enTetesAuth() {
+  const { data } = await supabase.auth.getSession();
+  const jwt = data?.session?.access_token;
+  if (!jwt) throw new Error(tg("Connectez-vous pour utiliser cette fonction.", "Log in to use this feature."));
+  return { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` };
+}
+
+async function callClaudeStream(action, payload, onChunk) {
   checkRateLimit();
+  const headers = await enTetesAuth();
   const res = await fetch("/.netlify/functions/claude-stream", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, max_tokens: maxTokens, system, userText }),
+    headers,
+    body: JSON.stringify({ action, payload }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
@@ -462,20 +484,23 @@ async function callClaudeStream(system, userText, maxTokens = 800, model = MODEL
   return fullText;
 }
 
-async function callClaude(system, userText, maxTokens = 800, model = MODEL_SONNET) {
+// Renvoie { text, credits } — credits est le nouveau solde si l'action en a
+// débité un côté serveur (null sinon).
+async function callClaude(action, payload) {
   checkRateLimit();
+  const headers = await enTetesAuth();
   const res = await fetch("/.netlify/functions/claude", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model, max_tokens: maxTokens, system,
-      messages: [{ role: "user", content: [{ type: "text", text: userText }] }],
-    }),
+    headers,
+    body: JSON.stringify({ action, payload }),
   });
   let data;
   try { data = await res.json(); } catch { throw new Error(tg("Réponse du serveur illisible. Réessayez.", "Unreadable server response. Please try again.")); }
   if (!res.ok) throw new Error(data?.error?.message || `Erreur de connexion (code ${res.status})`);
-  return data.content?.map(b => b.text || "").join("") || "";
+  return {
+    text: data.content?.map(b => b.text || "").join("") || "",
+    credits: typeof data.credits === "number" ? data.credits : null,
+  };
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -826,39 +851,57 @@ function detecterSecteur(texteOffre, texteCV) {
 
 // ── Extraire les mots-clés importants de l'offre ──────────────────
 function extraireMotsCles(texteOffre, secteur) {
-  // 1) N-grams : les expressions multi-mots connues présentes dans l'offre
-  //    sont les mots-clés les plus fiables (ex : "gestion de projet").
-  const offreNorm = texteOffre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  // 0) Purge du boilerplate marketing ("équipe dynamique", "fast-paced"...)
+  //    et neutralisation des zones entreprise/avantages/process.
+  const { sectionParLigne, lignes } = detecterSectionsOffre(texteOffre);
+  const EXCLUES = new Set(["entreprise", "avantages", "process"]);
+  const poidsLigne = (i) => {
+    const s = sectionParLigne[i];
+    if (s === "profil_requis") return 3;   // les vrais critères
+    if (EXCLUES.has(s)) return 0;          // bruit
+    return 1;                              // missions / non identifié
+  };
+  let corpsUtile = [];
+  for (let i = 0; i < lignes.length; i++) {
+    if (poidsLigne(i) > 0) corpsUtile.push(lignes[i]);
+  }
+  let texteUtile = corpsUtile.join("\n").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  for (const b of BOILERPLATE_OFFRE) {
+    texteUtile = texteUtile.split(b).join(" ");
+  }
+
+  // 1) N-grams connus présents dans les zones utiles
   const langueOffre = detecterLangueTexte(texteOffre);
   const listeNgrams = langueOffre === "en" ? NGRAMS_EN : NGRAMS_FR;
   const ngramsTrouves = [];
   for (const ng of listeNgrams) {
     if (ngramsTrouves.length >= 6) break;
-    const rx = new RegExp(`\\b${ng.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i");
-    if (rx.test(offreNorm)) ngramsTrouves.push(ng);
+    const rx = new RegExp("\\b" + ng.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+    if (rx.test(texteUtile)) ngramsTrouves.push(ng);
   }
-  // Les mots composant un n-gram retenu ne doivent pas re-compter en unigram
   const motsDejaCouverts = new Set(ngramsTrouves.flatMap(ng => ng.split(/\s+/)));
 
-  const tokens = tokeniser(texteOffre);
+  // 2) Unigrams pondérés par section
   const freq = {};
-  for (const t of tokens) {
-    if (t.length < 4) continue;  // ignorer mots trop courts
-    freq[t] = (freq[t] || 0) + 1;
+  for (let i = 0; i < lignes.length; i++) {
+    const p = poidsLigne(i);
+    if (p === 0) continue;
+    for (const t of tokeniser(lignes[i], langueOffre)) {
+      if (t.length < 4) continue;
+      freq[t] = (freq[t] || 0) + p;
+    }
   }
-  // Bonus aux mots du dictionnaire du secteur détecté
+  // Bonus dictionnaire sectoriel
   const motsCleSecteur = secteur !== "default" ? [...(SECTEUR_KEYWORDS[secteur] || []), ...(SECTEUR_KEYWORDS_EN[secteur] || [])].map(m =>
-    m.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    m.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
   ) : [];
   for (const mc of motsCleSecteur) {
-    if (freq[mc]) freq[mc] += 3;  // boost
+    if (freq[mc]) freq[mc] += 3;
   }
-  // Tri par fréquence + bonus, en excluant les mots déjà couverts par un n-gram
   const triés = Object.entries(freq)
     .sort((a, b) => b[1] - a[1])
     .map(([mot]) => mot)
     .filter(m => m.length >= 4 && !/^\d+$/.test(m) && !motsDejaCouverts.has(m) && !MOTS_MARQUEURS.has(m));
-  // N-grams en tête (mots-clés forts), complétés par les unigrams
   return [...ngramsTrouves, ...triés].slice(0, 15);
 }
 
@@ -1341,6 +1384,117 @@ const CONSEIL_SECTEUR = {
 
 
 // ═══════════════════════════════════════════════════════════════════
+//   GRAMMAIRE DES OFFRES (Deep Research) : sections, boilerplate,
+//   expérience exigée, diplômes (échelle EQF). Tout désaccentué.
+// ═══════════════════════════════════════════════════════════════════
+const SECTIONS_OFFRE_HEADERS = {
+  entreprise: ["a propos de nous", "qui sommes-nous", "notre entreprise", "presentation de l'entreprise", "notre histoire", "a propos", "notre raison d'etre", "rejoindre notre entreprise", "le mot de l'employeur", "portrait de l'entreprise", "notre vision et nos valeurs", "decouvrez notre univers", "presentation du groupe", "pourquoi nous rejoindre", "notre mission", "notre adn", "l'entreprise", "notre culture", "qui est notre client", "mieux nous connaitre", "about us", "who we are", "about the company", "our story", "our mission", "about our client", "our values", "our culture", "meet the team", "company overview", "about the group", "why join us", "the company", "our vision", "our purpose"],
+  missions: ["vos missions", "descriptif du poste", "le poste", "votre mission", "description du poste", "missions principales", "ce que vous ferez", "votre quotidien", "missions", "vos futures missions", "votre role", "responsabilites", "le role", "vos missions principales", "votre quotidien chez nous", "ce que nous attendons de vous", "detail des missions", "principales responsabilites", "les missions du poste", "responsibilities", "what you'll do", "the role", "job description", "key responsibilities", "your responsibilities", "what you will do", "about the role", "your role", "main responsibilities", "essential duties", "duties and responsibilities", "key duties", "what the role involves", "daily tasks", "your day-to-day", "essential functions", "the opportunity", "core responsibilities", "scope of work"],
+  profil_requis: ["profil recherche", "competences requises", "votre profil", "profil", "ce que nous recherchons", "competences attendues", "qualifications requises", "prerequis", "le profil ideal", "ce que vous apportez", "vos competences", "qui etes-vous", "experiences et competences", "notre candidat ideal", "profil requis", "competences souhaitees", "ce poste est fait pour vous si", "formations et competences", "requirements", "qualifications", "what we're looking for", "about you", "skills and experience", "who you are", "what you'll need", "your profile", "required skills", "preferred qualifications", "ideal candidate", "what you bring", "candidate profile", "key qualifications", "essential criteria", "skills required", "experience required", "desired profile", "what we look for", "professional requirements"],
+  avantages: ["avantages", "ce que nous offrons", "les avantages", "les plus", "avantages salaries", "ce que nous vous proposons", "remuneration et avantages", "ce que vous y gagnerez", "ce que nous vous apportons", "notre offre", "les + de l'offre", "pourquoi postuler", "conditions et avantages", "package et avantages", "pourquoi venir chez nous", "ce que l'on vous offre", "avantages sociaux", "ce que l'entreprise vous offre", "les avantages du poste", "benefits", "what we offer", "perks", "what we offer you", "benefits and perks", "why you'll love working here", "what's in it for you", "our offer", "compensation and benefits", "what you'll get", "employee benefits", "perks & benefits", "what we can offer you", "what we provide", "working conditions", "remuneration and benefits", "reasons to join us", "the perks", "our promise"],
+  process: ["processus de recrutement", "deroulement des entretiens", "les etapes de recrutement", "processus de selection", "deroulement du recrutement", "etapes de recrutement", "notre processus de recrutement", "comment postuler", "le processus de recrutement", "etapes du recrutement", "le parcours de recrutement", "process de recrutement", "nos etapes de recrutement", "deroulement de la selection", "comment ca se passe", "votre parcours de recrutement", "les etapes pour nous rejoindre", "hiring process", "interview process", "recruitment process", "our recruitment process", "how to apply", "selection process", "steps in the process", "our hiring process", "interview steps", "how we hire", "application process", "recruitment steps", "what to expect", "hiring journey", "selection stages", "next steps"],
+};
+const BOILERPLATE_OFFRE = ["equipe dynamique", "leader sur son marche", "societe en pleine croissance", "challenges passionnants", "environnement stimulant", "remuneration attractive", "des que possible", "a pourvoir rapidement", "prise de poste", "dans le cadre de son developpement", "notre client recrute", "cabinet de recrutement", "acteur incontournable", "culture d'entreprise", "rejoindre une equipe", "rejoindre notre equipe", "developpement professionnel", "equilibre vie pro vie perso", "perspectives d'evolution", "cadre de travail agreable", "plan d'epargne entreprise", "mutuelle d'entreprise", "titres restaurant", "tickets restaurant", "carte ticket restaurant", "remboursement transport", "teletravail hybride", "teletravail partiel", "bonne humeur", "cafe a volonte", "entreprise a taille humaine", "esprit familial", "n'hesitez plus", "postulez des maintenant", "ambiance conviviale", "esprit d'equipe", "rejoignez-nous", "poste base", "join our team", "fast-paced environment", "fast-paced", "competitive salary", "equal opportunity employer", "equal opportunity", "dynamic team", "exciting opportunity", "remote-friendly", "flexible working hours", "health insurance", "paid time off", "401k matching", "collaborative environment", "highly motivated", "industry leader", "leading company", "rapidly growing", "passionate about", "state of the art", "cutting edge", "fast-growing startup", "innovative solution", "diverse and inclusive", "hybrid work", "work-life balance", "career advancement", "professional development", "great work environment", "all qualified applicants", "competitive compensation", "stock options", "annual bonus", "free snacks", "coffee and tea", "gym membership", "apply today", "send your resume", "look no further", "ready to take the next step", "team player", "self-starter", "result-oriented"];
+const SENIORITE_TABLE = [
+  { terme: "junior", min: 0, max: 2 },
+  { terme: "debutant", min: 0, max: 1 },
+  { terme: "jeune diplome", min: 0, max: 2 },
+  { terme: "premiere experience", min: 0, max: 2 },
+  { terme: "intermediaire", min: 2, max: 5 },
+  { terme: "confirme", min: 3, max: 5 },
+  { terme: "senior", min: 5, max: 10 },
+  { terme: "expert", min: 7, max: 15 },
+  { terme: "entry-level", min: 0, max: 2 },
+  { terme: "entry level", min: 0, max: 2 },
+  { terme: "graduate", min: 0, max: 1 },
+  { terme: "mid-level", min: 2, max: 5 },
+  { terme: "mid level", min: 2, max: 5 },
+  { terme: "intermediate", min: 2, max: 5 },
+  { terme: "seasoned", min: 7, max: 12 },
+  { terme: "principal", min: 8, max: 15 },
+];
+const DIPLOMES_EQF = [
+  { niveau: 3, mots: ["cap", "bep", "certificat d'aptitude professionnelle", "nvq level 1", "vocational qualification"] },
+  { niveau: 4, mots: ["bac", "baccalaureat", "bac pro", "bac techno", "brevet professionnel", "high school diploma", "a-levels", "a levels", "ged", "international baccalaureate"] },
+  { niveau: 5, mots: ["bac+2", "bts", "dut", "deug", "deust", "associate degree", "associate's degree", "hnd", "hnc", "higher national diploma", "foundation degree"] },
+  { niveau: 6, mots: ["bac+3", "licence", "licence professionnelle", "licence pro", "bachelor", "dcg", "bachelor's degree", "bachelor's", "bachelor of science", "bachelor of arts", "undergraduate degree", "beng"] },
+  { niveau: 7, mots: ["bac+5", "bac+4", "master", "maitrise", "diplome d'ingenieur", "diplome d'ecole de commerce", "dscg", "msc", "magistere", "master's degree", "master's", "master of science", "master of business administration", "mba", "postgraduate diploma", "meng"] },
+  { niveau: 8, mots: ["doctorat", "bac+8", "hdr", "habilitation a diriger des recherches", "phd", "doctorate", "ph.d.", "doctoral degree", "doctor of philosophy", "dphil"] },
+];
+
+// ── Sections de l'offre : pondération de l'extraction ──────────────
+// profil_requis pese x3, missions x1, entreprise/avantages/process x0.
+function detecterSectionsOffre(texteOffre) {
+  const lignes = texteOffre.split(/\n/);
+  const sectionParLigne = [];
+  let courante = null;
+  for (const ligne of lignes) {
+    const l = ligne.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[:•·\-–—*#?!«»]/g, " ").replace(/\s+/g, " ").trim();
+    if (l.length > 0 && l.length <= 45) {
+      for (const [sec, variantes] of Object.entries(SECTIONS_OFFRE_HEADERS)) {
+        if (variantes.includes(l)) { courante = sec; break; }
+      }
+    }
+    sectionParLigne.push(courante);
+  }
+  return { sectionParLigne, lignes };
+}
+
+// ── Expérience exigée par l'offre (années ou terme de séniorité) ────
+function extraireExperienceRequise(texteOffre) {
+  const { sectionParLigne, lignes } = detecterSectionsOffre(texteOffre);
+  const aDesSections = sectionParLigne.some(s => s === "profil_requis");
+  const zone = lignes.filter((_, i) => !aDesSections || sectionParLigne[i] === "profil_requis" || sectionParLigne[i] === null)
+    .join("\n").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  if (/(debutant accepte|no experience required|pas d'experience exigee|premiere experience)/.test(zone)) {
+    return { min: 0, max: 2 };
+  }
+  let min = null, max = null, m;
+  const rx = /(\d{1,2})(?:\s*(?:a|à|-|to)\s*(\d{1,2}))?\s*\+?\s*(?:ans|years?)\b/g;
+  while ((m = rx.exec(zone))) {
+    const n = +m[1];
+    if (n < 1 || n > 15) continue;
+    if (min === null || n < min) min = n;
+    if (m[2] && +m[2] <= 30) max = Math.max(max ?? 0, +m[2]);
+  }
+  if (min !== null) return { min, max };
+  for (const s of SENIORITE_TABLE) {
+    if (new RegExp(`\\b${s.terme.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(zone)) {
+      return { min: s.min, max: s.max };
+    }
+  }
+  return { min: null, max: null };
+}
+
+// ── Diplôme exigé (échelle EQF 3-8) et présence dans le CV ─────────
+function scanNiveauDiplome(texteNorm) {
+  let niveau = null, libelle = null;
+  for (const d of DIPLOMES_EQF) {
+    for (const mot of d.mots) {
+      const rx = new RegExp(`(^|[^a-z0-9+])${mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`);
+      if (rx.test(texteNorm)) {
+        if (niveau === null || d.niveau > niveau) { niveau = d.niveau; libelle = mot; }
+        break;
+      }
+    }
+  }
+  return { niveau, libelle };
+}
+function analyserDiplome(texteOffre, texteCV) {
+  const { sectionParLigne, lignes } = detecterSectionsOffre(texteOffre);
+  const aDesSections = sectionParLigne.some(s => s === "profil_requis");
+  const zoneOffre = lignes.filter((_, i) => !aDesSections || sectionParLigne[i] === "profil_requis" || sectionParLigne[i] === null)
+    .join("\n").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const requis = scanNiveauDiplome(zoneOffre);
+  if (requis.niveau === null) return null;
+  const cvNorm = texteCV.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+  const cv = scanNiveauDiplome(cvNorm);
+  return { niveau: requis.niveau, libelle: requis.libelle, present: cv.niveau !== null && cv.niveau >= requis.niveau };
+}
+
+
+// ═══════════════════════════════════════════════════════════════════
 //   SCORE COMPOSITE v2 (calibration Deep Research)
 //   Pondérations sourcées : exigences 40 %, titre 30 %, souhaités 15 %,
 //   structure 15 %. Exigence critique manquante => plafonnement.
@@ -1348,24 +1502,10 @@ const CONSEIL_SECTEUR = {
 
 // Marqueurs d'exigence dure vs souhaitée (liste de démarrage — enrichie
 // ultérieurement par la recherche "grammaire des offres"). Désaccentués.
-const MARQUEURS_EXIGENCE_DURE = [
-  "exige", "exigee", "exigees", "requis", "requise", "requises", "obligatoire", "obligatoires",
-  "imperatif", "imperative", "indispensable", "indispensables", "maitrise de", "maitrise parfaite",
-  "vous devez", "doit imperativement", "necessaire", "necessaires", "diplome exige", "minimum",
-  "required", "must have", "must-have", "mandatory", "essential", "proven", "at least", "needs to",
-];
-const MARQUEURS_EXIGENCE_SOUHAITEE = [
-  "apprecie", "appreciee", "souhaite", "souhaitee", "serait un plus", "un plus", "idealement",
-  "atout", "notions de", "bonus", "de preference", "optionnel",
-  "nice to have", "nice-to-have", "preferred", "a plus", "ideally", "familiarity with", "desirable", "would be",
-];
+const MARQUEURS_EXIGENCE_DURE = ["imperatif", "imperative", "exige", "exigee", "exigees", "indispensable", "indispensables", "requis", "requise", "requises", "obligatoire", "obligatoires", "vous devez", "maitrise parfaite de", "maitrise imperative", "experience exigee", "necessaire", "necessaires", "vous justifiez obligatoirement", "il est indispensable de", "maitrise absolue", "imperativement", "obligatoirement", "condition sine qua non", "vous maitrisez parfaitement", "vous devez imperativement", "minimum", "maitrise de", "must have", "must-have", "required", "mandatory", "essential", "proven", "you must", "is required", "fluent in", "must demonstrate", "is essential", "are required", "proven experience", "you will need", "mandatory requirement", "must possess", "minimum of", "is mandatory", "solid understanding of", "perfect mastery of", "strong experience in", "must be able to", "demonstrated ability", "has to be", "at least", "needs to", "necessary"];
+const MARQUEURS_EXIGENCE_SOUHAITEE = ["serait un plus", "idealement", "apprecie", "appreciee", "apprecies", "souhaite", "souhaitee", "souhaitees", "un atout", "notions de", "fortement apprecie", "serait grandement apprecie", "constitue un plus", "un veritable atout", "des notions de", "serait appreciee", "idealement diplome", "est un plus", "fortement souhaite", "serait un veritable avantage", "de preference", "optionnel", "bonus", "nice to have", "nice-to-have", "a plus", "preferred", "ideally", "familiarity with", "would be an asset", "strongly preferred", "is desired", "plus but not required", "is a plus", "experience is preferred", "highly appreciated", "not required but a plus", "is an advantage", "would be beneficial", "familiarity is a plus", "desirable", "would be"];
 // Mots de marquage : jamais des mots-clés en eux-mêmes (exclus de l'extraction)
-const MOTS_MARQUEURS = new Set(
-  [...MARQUEURS_EXIGENCE_DURE, ...MARQUEURS_EXIGENCE_SOUHAITEE]
-    .flatMap(m => m.split(/[\s-]+/))
-    .filter(w => w.length >= 4)
-    .concat(["maitrise", "maitrisez", "exigence", "exigences", "profil", "recherche", "recherchons"])
-);
+const MOTS_MARQUEURS = new Set(["exige", "exigee", "exigees", "exigence", "exigences", "requis", "requise", "requises", "required", "obligatoire", "obligatoires", "mandatory", "imperatif", "imperative", "imperativement", "obligatoirement", "indispensable", "indispensables", "essential", "necessaire", "necessaires", "necessary", "minimum", "maitrise", "maitrisez", "proven", "preferred", "ideally", "idealement", "apprecie", "appreciee", "apprecies", "souhaite", "souhaitee", "souhaitees", "atout", "atouts", "notions", "bonus", "desirable", "familiarity", "optionnel", "preference", "profil", "recherche", "recherchons", "justifiez", "titulaire", "condition", "demonstrated", "possess", "diplome", "diplomes", "ecole", "ecoles", "experience", "experiences", "serait", "mission", "missions", "poste", "postes", "annee", "annees", "formation", "formations", "niveau", "connaissance", "connaissances", "justifier", "candidat", "candidate", "idealement"]);
 
 // Classe chaque mot-clé selon le contexte de sa ligne dans l'offre.
 function classifierExigences(texteOffre, motsCles) {
@@ -1448,6 +1588,12 @@ function analyserAlgo(texteCV, texteOffre) {
   const titreMatch = scoreTitrePoste(titrePoste, texteCV);
   // 4. Structure du CV
   const structure = scoreStructureCV(texteCV);
+  // 4bis. Expérience exigée par l'offre vs détectée dans le CV
+  const experienceRequise = extraireExperienceRequise(texteOffre);
+  let experienceCV = null;
+  try { experienceCV = extraireChronologie(texteCV).anneesExperience; } catch {}
+  // 4ter. Diplôme exigé (EQF) et présence dans le CV
+  const diplomeRequis = analyserDiplome(texteOffre, texteCV);
   // 5. Score composite pondéré (calibration documentée 40/30/15/15)
   const composanteExigences = couvertureDurs !== null ? couvertureDurs
     : (motsCles.length ? (cmpDurs.presents.length + cmpAutres.presents.length) / motsCles.length : 0.5);
@@ -1461,6 +1607,10 @@ function analyserAlgo(texteCV, texteOffre) {
   const critiquesManquants = cmpDurs.manquants;
   if (critiquesManquants.length >= 3) score = Math.min(score, 55);
   else if (critiquesManquants.length >= 1) score = Math.min(score, 75);
+  // Expérience clairement insuffisante (> 1 an d'écart) => plafond
+  if (experienceRequise.min !== null && experienceCV !== null && experienceCV < experienceRequise.min - 1) {
+    score = Math.min(score, 70);
+  }
   score = Math.max(3, Math.min(100, score));
   // 6. Points forts/faibles + conseil sectoriel
   const pointsForts = detecterPointsForts(texteCV);
@@ -1481,6 +1631,9 @@ function analyserAlgo(texteCV, texteOffre) {
     motsManquantsCritiques: critiquesManquants.slice(0, 8),
     titrePoste,
     titreMatch: Math.round(titreMatch * 100),
+    experienceRequise,
+    experienceCV,
+    diplomeRequis,
     sousScores: {
       exigences: Math.round(composanteExigences * 100),
       titre: Math.round(titreMatch * 100),
@@ -4542,9 +4695,13 @@ export default function App() {
     const { data } = await supabase.from("profils").select("credits").eq("id", s.user.id).single();
     if (data) setCredits(data.credits);
   };
+  // Tient à jour l'identité utilisée par stripeUrl() (crédit du bon compte).
+  const majUtilisateurCourant = (s) => {
+    CURRENT_USER = s?.user ? { id: s.user.id, email: s.user.email || "" } : null;
+  };
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); chargerCredits(data.session); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => { setSession(s); chargerCredits(s); });
+    supabase.auth.getSession().then(({ data }) => { setSession(data.session); majUtilisateurCourant(data.session); chargerCredits(data.session); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => { setSession(s); majUtilisateurCourant(s); chargerCredits(s); });
     return () => sub.subscription.unsubscribe();
   }, []);
 
@@ -4671,8 +4828,14 @@ export default function App() {
         envelopper("MOTS_CLES", analyse?.motsManquants?.join(", ") || ""),
       ].filter(Boolean).join("\n\n");
 
-      // Le CV est généré en JSON structuré : on attend la réponse complète avant de parser
-      const raw = await callClaude(PROMPT_REWRITE, userText, 2500, MODEL_OPUS);
+      // Le CV est généré en JSON structuré : on attend la réponse complète avant de parser.
+      // SÉCURITÉ : le serveur vérifie le compte, débite le crédit ATOMIQUEMENT
+      // AVANT l'appel IA (et rembourse si l'IA échoue). Plus aucun débit côté client.
+      const { text: raw, credits: soldeServeur } = await callClaude("rewrite", {
+        cv: cvContent,
+        offre: offreContent,
+        motsCles: analyse?.motsManquants?.join(", ") || "",
+      });
       if (!raw?.trim()) throw new Error(T("Réponse vide. Réessayez s'il vous plaît.", "Empty response. Please try again."));
       let cv;
       try {
@@ -4700,8 +4863,9 @@ export default function App() {
         if (typeof cv.nouveauScore === "number") scoreReecrit = cv.nouveauScore;
       }
       setScoreOptimise(Math.max(scoreReecrit, ancienScore));
-      const { data: soldeApres, error: errDep } = await supabase.rpc("depenser_credit", { montant: CREDITS.REWRITE });
-      if (!errDep && typeof soldeApres === "number") setCredits(soldeApres);
+      // Le débit a déjà eu lieu côté serveur : on affiche le solde renvoyé.
+      if (typeof soldeServeur === "number") setCredits(soldeServeur);
+      else chargerCredits(session);
       setPaid(true); // le credit depense pour la reecriture debloque le dossier (telechargement + copie + lettre)
     } catch (err) {
       setCvOptError(err.message || T("Erreur inattendue durant la réécriture.", "Unexpected error during the rewrite."));
@@ -4718,8 +4882,7 @@ export default function App() {
     if (traduisant || !source) return;
     setTraduisant(true); setTraductionError("");
     try {
-      const userText = envelopper("CV_JSON", JSON.stringify(source));
-      const raw = await callClaude(PROMPT_TRADUCTION, userText, 2500, MODEL_SONNET);
+      const { text: raw } = await callClaude("traduction", { cvJson: JSON.stringify(source) });
       if (!raw?.trim()) throw new Error(T("Réponse vide. Réessayez s'il vous plaît.", "Empty response. Please try again."));
       let cvEn;
       try {
@@ -4765,27 +4928,26 @@ export default function App() {
 
       // Interface anglaise : lettre EN ANGLAIS, basée sur le CV anglais
       // s'il existe (sinon le CV français, Claude gère la transition).
+      // Le prompt (et la règle de langue) vivent désormais CÔTÉ SERVEUR.
       const lettreEnAnglais = lang === "en";
       const cvSource = (lettreEnAnglais && cvEnAnglais) ? cvEnAnglais : (cvEdite || cvOpt);
-      const promptLettre = lettreEnAnglais
-        ? PROMPT_LETTRE + "\n\nREGLE DE LANGUE ABSOLUE : redige la lettre ENTIEREMENT EN ANGLAIS professionnel (cover letter, marche americain/international) : ton direct, verbes d action, aucune tournure traduite litteralement du francais, salutations et formule de politesse anglophones (Dear Hiring Manager..., Sincerely)."
-        : PROMPT_LETTRE;
-
-      const userText = [
-        envelopper("CV", cvSource ? cvVersTexte(cvSource) : ""),
-        envelopper("FICHE_POSTE", offreContent),
-      ].filter(Boolean).join("\n\n");
+      const payloadLettre = {
+        cv: cvSource ? cvVersTexte(cvSource) : "",
+        offre: offreContent,
+        lang: lettreEnAnglais ? "en" : "fr",
+      };
 
       let result = "";
       try {
-        result = await callClaudeStream(promptLettre, userText, 700, MODEL_SONNET, (partial) => setLettre(partial));
+        result = await callClaudeStream("lettre", payloadLettre, (partial) => setLettre(partial));
       } catch {
-        result = await callClaude(promptLettre, userText, 700, MODEL_SONNET);
+        result = (await callClaude("lettre", payloadLettre)).text;
         setLettre(result);
       }
       if (!result?.trim() || result.trim().length < 100) throw new Error(T("La réponse est trop courte. Réessayez s'il vous plaît.", "The response is too short. Please try again."));
       setLettreOriginale(result); // sauvegarde pour permettre de "Revenir à l'original"
-      setCredits(depenseCredits(CREDITS.LETTRE));
+      // (Plus de débit localStorage ici : la lettre est incluse dans le crédit
+      //  du dossier, et l'ancienne ligne écrasait l'affichage du solde serveur.)
     } catch (err) {
       setLettreError(err.message || T("Erreur inattendue durant la rédaction.", "Unexpected error while writing."));
     }
@@ -4851,8 +5013,11 @@ export default function App() {
 
   const doPivot = async () => {
     if (pivotLoading) return;
-    if (credits < CREDITS.PIVOT) {
-      setPivotError(T(`Il vous faut 1 action IA pour les pistes de reconversion. Achetez la recharge à 2,99 €.`, `You need 1 AI action for the career-change options. Buy the top-up at €2.99.`));
+    // SÉCURITÉ : cette action IA a un coût API réel — compte obligatoire
+    // (le serveur l'exige de toute façon, et applique un quota journalier).
+    if (!session) {
+      setShowAuth(true);
+      setPivotError(T("Connectez-vous pour découvrir vos pistes de reconversion.", "Log in to see your career-change options."));
       return;
     }
     setPivotLoading(true); setPivotError(""); setPivots(null);
@@ -4861,11 +5026,9 @@ export default function App() {
       if (cvPdfInfo?.texte && !cvPdfInfo.estPhoto) cvContent = limiterTexte(cvPdfInfo.texte, LIMITS.CV_MAX).texte;
       else if (cvText) cvContent = limiterTexte(cvText, LIMITS.CV_MAX).texte;
 
-      const userText = envelopper("CV_CANDIDAT", cvContent);
-      const raw = await callClaude(PROMPT_PIVOT, userText, 700, MODEL_SONNET);
+      const { text: raw } = await callClaude("pivot", { cv: cvContent });
       const parsed = validerPivot(raw);
       setPivots(parsed);
-      setCredits(depenseCredits(CREDITS.PIVOT));
     } catch (err) {
       setPivotError(err.message || T("Erreur lors de l'analyse de reconversion.", "Error during the career-change analysis."));
     }
@@ -5056,6 +5219,27 @@ export default function App() {
                     </div>
                   </div>
                 ))}
+                {analyse.experienceRequise?.min != null && (
+                  <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: `1px solid ${C.border}`, fontSize: "13.5px", color: C.textSecondary, lineHeight: 1.5 }}>
+                    {T("Expérience demandée : ", "Experience required: ")}<strong style={{ color: C.text }}>{analyse.experienceRequise.min}{analyse.experienceRequise.max ? `-${analyse.experienceRequise.max}` : "+"} {T("ans", "years")}</strong>
+                    {analyse.experienceCV != null && <>
+                      {" — "}{T("détectée dans votre CV : ", "detected in your résumé: ")}
+                      <strong style={{ color: analyse.experienceCV >= analyse.experienceRequise.min - 1 ? C.success : C.error }}>
+                        {analyse.experienceCV} {T("ans", "years")} {analyse.experienceCV >= analyse.experienceRequise.min - 1 ? "✓" : ""}
+                      </strong>
+                      {analyse.experienceCV < analyse.experienceRequise.min - 1 && T(" — datez clairement vos expériences si ce chiffre est sous-estimé", " — date your roles clearly if this is underestimated")}
+                    </>}
+                  </div>
+                )}
+                {analyse.diplomeRequis && (
+                  <div style={{ marginTop: "8px", fontSize: "13.5px", color: C.textSecondary, lineHeight: 1.5 }}>
+                    {T("Diplôme demandé : ", "Degree required: ")}<strong style={{ color: C.text }}>{analyse.diplomeRequis.libelle}</strong>
+                    {" — "}
+                    {analyse.diplomeRequis.present
+                      ? <span style={{ color: C.success, fontWeight: 700 }}>{T("niveau repéré dans votre CV ✓", "level found in your résumé ✓")}</span>
+                      : <span style={{ color: C.warningText, fontWeight: 600 }}>{T("non repéré : mentionnez votre diplôme avec son niveau (Bac+X, Master…)", "not found: state your degree and its level explicitly")}</span>}
+                  </div>
+                )}
                 {analyse.titrePoste && (
                   <div style={{ marginTop: "12px", paddingTop: "10px", borderTop: `1px solid ${C.border}`, fontSize: "13.5px", color: C.textSecondary, lineHeight: 1.5 }}>
                     {T("Intitulé visé : ", "Target title: ")}<strong style={{ color: C.text }}>« {analyse.titrePoste} »</strong>

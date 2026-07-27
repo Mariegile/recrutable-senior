@@ -262,24 +262,29 @@ function ajouterCredits(n) {
 }
 
 // ═════════════════════════════════════════════════════════════════
-//   CODES CADEAU (geste commercial / depannage) — usage unique
+//   CODES CADEAU — validés CÔTÉ SERVEUR (usage unique réel)
 // ═════════════════════════════════════════════════════════════════
-// code (MAJUSCULES) : nombre de credits offerts. Ajoute/modifie librement.
-const CODES_CADEAU = {
-  // Aucun code actif (MERCI100 annule le 18/06/2026, cliente remboursee).
-  // Pour (re)activer un code, ajoute une ligne, ex : "MONCODE": 100,
-};
-const USED_CODES_KEY = "recrutable_codes_utilises";
-function utiliserCodeCadeau(rawCode) {
+// SÉCURITÉ : les codes ne sont PLUS dans le code source (ils étaient
+// lisibles par n'importe qui via F12) et l'usage unique ne repose plus
+// sur localStorage (effaçable → réutilisation infinie). Les codes vivent
+// dans la table `codes_cadeau` (Supabase) ; la fonction Netlify vérifie
+// le compte, l'expiration, le quota et crédite atomiquement.
+// Pour créer un code : INSERT dans la table (voir supabase-codes-cadeau.sql).
+async function utiliserCodeCadeau(rawCode) {
   try {
     const code = String(rawCode || "").trim().toUpperCase();
-    if (!code || !(code in CODES_CADEAU)) return { ok: false, raison: "inconnu" };
-    const used = JSON.parse(localStorage.getItem(USED_CODES_KEY) || "[]");
-    if (used.includes(code)) return { ok: false, raison: "deja" };
-    used.push(code);
-    localStorage.setItem(USED_CODES_KEY, JSON.stringify(used));
-    const total = ajouterCredits(CODES_CADEAU[code]);
-    return { ok: true, credits: CODES_CADEAU[code], total };
+    if (!code) return { ok: false, raison: "inconnu" };
+    const { data } = await supabase.auth.getSession();
+    const jwt = data?.session?.access_token;
+    if (!jwt) return { ok: false, raison: "connexion" };
+    const res = await fetch("/.netlify/functions/code-cadeau", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
+      body: JSON.stringify({ code }),
+    });
+    const r = await res.json().catch(() => ({}));
+    if (!res.ok || !r.ok) return { ok: false, raison: r.raison || "erreur" };
+    return { ok: true, credits: r.credits, total: r.total };
   } catch { return { ok: false, raison: "erreur" }; }
 }
 
@@ -4560,7 +4565,7 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
           <div style={{ fontSize: "14px", fontWeight: 600, color: C.text, marginBottom: "8px", textAlign: "center" }}>{T("Vous avez un code cadeau ?", "Have a gift code?")}</div>
           <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
             <input value={codeInput} onChange={(e) => setCodeInput(e.target.value)} placeholder={T("Entrez votre code", "Enter your code")} style={{ flex: 1, minWidth: "180px", padding: "10px 14px", border: `1.5px solid ${C.inputBorder}`, borderRadius: "10px", fontSize: "15px", fontFamily: FONT_SANS, textTransform: "uppercase" }} />
-            <button onClick={() => { const r = onRedeem(codeInput); if (r.ok) { setCodeMsg({ ok: true, text: T(r.credits + " crédits ajoutés ! Vous avez maintenant " + r.total + " crédits.", r.credits + " credits added! You now have " + r.total + " credits.") }); setCodeInput(""); } else if (r.raison === "deja") { setCodeMsg({ ok: false, text: T("Ce code a déjà été utilisé.", "This code has already been used.") }); } else { setCodeMsg({ ok: false, text: T("Code invalide.", "Invalid code.") }); } }} style={{ padding: "10px 18px", background: C.primary, color: "#FFF", border: "none", borderRadius: "10px", fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>{T("Valider", "Apply")}</button>
+            <button onClick={async () => { setCodeMsg(null); const r = await onRedeem(codeInput); if (r.ok) { setCodeMsg({ ok: true, text: T(r.credits + " crédits ajoutés ! Vous avez maintenant " + r.total + " crédits.", r.credits + " credits added! You now have " + r.total + " credits.") }); setCodeInput(""); } else if (r.raison === "deja") { setCodeMsg({ ok: false, text: T("Ce code a déjà été utilisé.", "This code has already been used.") }); } else if (r.raison === "connexion") { setCodeMsg({ ok: false, text: T("Connectez-vous pour utiliser un code cadeau.", "Log in to use a gift code.") }); } else if (r.raison === "expire") { setCodeMsg({ ok: false, text: T("Ce code a expiré.", "This code has expired.") }); } else if (r.raison === "epuise") { setCodeMsg({ ok: false, text: T("Ce code n'est plus disponible.", "This code is no longer available.") }); } else { setCodeMsg({ ok: false, text: T("Code invalide.", "Invalid code.") }); } }} style={{ padding: "10px 18px", background: C.primary, color: "#FFF", border: "none", borderRadius: "10px", fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>{T("Valider", "Apply")}</button>
           </div>
           {codeMsg && (<div style={{ marginTop: "8px", fontSize: "13px", textAlign: "center", fontWeight: 600, color: codeMsg.ok ? C.success : C.error }}>{codeMsg.text}</div>)}
         </div>
@@ -4679,11 +4684,27 @@ export default function App() {
     const code = params.get("code");
     if (!code) return;
     window.history.replaceState({}, "", window.location.pathname);
-    const r = utiliserCodeCadeau(code);
-    if (r.ok) {
-      setCredits(r.total);
-      setTimeout(() => alert(T("Code cadeau validé ! " + r.credits + " crédits ont été ajoutés à votre compte.", "Gift code applied! " + r.credits + " credits have been added to your account.")), 300);
-    }
+    // Le code est validé côté serveur : il faut être connecté. Si la session
+    // n'est pas encore chargée, on retente une fois après l'init de Supabase.
+    let annule = false;
+    const appliquer = async () => {
+      const r = await utiliserCodeCadeau(code);
+      if (annule) return true;
+      if (r.ok) {
+        setCredits(r.total);
+        setTimeout(() => alert(T("Code cadeau validé ! " + r.credits + " crédits ont été ajoutés à votre compte.", "Gift code applied! " + r.credits + " credits have been added to your account.")), 300);
+        return true;
+      }
+      return r.raison !== "connexion"; // seul le cas "pas connecté" mérite un retry
+    };
+    (async () => {
+      if (await appliquer()) return;
+      const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+        if (s) { sub.subscription.unsubscribe(); appliquer(); }
+      });
+      setTimeout(() => sub.subscription.unsubscribe(), 5 * 60 * 1000);
+    })();
+    return () => { annule = true; };
   }, []);
 
   // ── Connexion / session (Supabase) ───────────────────────────────
@@ -5068,7 +5089,7 @@ export default function App() {
         open={showOffres}
         onClose={() => setShowOffres(false)}
         credits={credits}
-        onRedeem={(code) => { const r = utiliserCodeCadeau(code); if (r.ok) setCredits(r.total); return r; }}
+        onRedeem={async (code) => { const r = await utiliserCodeCadeau(code); if (r.ok) setCredits(r.total); return r; }}
       />
 
       <div className={`app-main-container${step === 1 && montrerHero ? " accueil-mode" : ""}`} style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>

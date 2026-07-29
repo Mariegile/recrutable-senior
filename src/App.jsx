@@ -2410,7 +2410,7 @@ function PaymentSuccessBanner({ formule, credits, onClose }) {
 // ── Accueil : les 3 étapes du parcours (partagées hero PC / overlay mobile) ──
 const HERO_ETAPES = [
   { n: 1, icone: "📋", titre: "Collez votre CV", titreEn: "Paste your résumé", texte: "Ou envoyez le PDF — même imparfait, c'est notre travail de l'améliorer.", texteEn: "Or upload the PDF — even a rough one, improving it is our job." },
-  { n: 2, icone: "🔍", titre: "Découvrez votre score", titreEn: "See your score", texte: "Analyse gratuite et illimitée face à l'offre d'emploi visée.", texteEn: "Free, unlimited analysis against the job you're targeting." },
+  { n: 2, icone: "🔍", titre: "Découvrez votre score", titreEn: "See your score", texte: "Compatibilité avec l'offre visée et lisibilité par les filtres ATS. Gratuit, illimité.", texteEn: "Match with the target job and readability by ATS filters. Free, unlimited." },
   { n: 3, icone: "⬇️", titre: "Téléchargez votre dossier", titreEn: "Download your documents", texte: "CV restructuré pour cette offre et lettre assortie, prêts à envoyer.", texteEn: "Résumé restructured for that job and a matching letter, ready to send." },
 ];
 
@@ -2496,8 +2496,8 @@ function HeroOverlayMobile({ onClose }) {
           </h2>
           <p style={{ margin: "14px 0 22px", fontSize: "16px", lineHeight: 1.6, color: C.textSecondary }}>
             {T(
-              "Un recruteur passe moins d'une minute sur un CV. Recrutable compare gratuitement le vôtre à l'offre visée, puis le restructure pour cette offre-là : l'essentiel devient visible tout de suite.",
-              "A recruiter spends less than a minute on a résumé. Recrutable compares yours to the job you're targeting for free, then restructures it for that specific role, so what matters stands out immediately."
+              "Un recruteur passe moins d'une minute sur un CV — et beaucoup d'entreprises le font d'abord trier par un logiciel (ATS). Recrutable compare gratuitement le vôtre à l'offre visée, puis le restructure pour cette offre-là.",
+              "A recruiter spends less than a minute on a résumé — and many companies screen it with software (ATS) first. Recrutable compares yours to the job you're targeting for free, then restructures it for that specific role."
             )}
           </p>
         </div>
@@ -2561,8 +2561,8 @@ function HeroAccueil({ onStart }) {
             color: C.textSecondary, maxWidth: "560px",
           }}>
             {T(
-              "Un recruteur passe trente à quarante secondes sur un CV — et quand l'entreprise trie par logiciel, encore moins. ",
-              "A recruiter spends thirty to forty seconds on a résumé — and when a company screens with software, even less. "
+              "Un recruteur passe trente à quarante secondes sur un CV. Et dans les entreprises équipées d'un logiciel de tri (ATS) — deux grandes entreprises sur trois — il faut d'abord passer la machine. ",
+              "A recruiter spends thirty to forty seconds on a résumé. And in companies using screening software (ATS) — two out of three large firms — you have to get past the machine first. "
             )}
             <strong style={{ color: C.text }}>{T(
               "Envoyer le même CV à toutes les offres, c'est perdre à chaque fois.",
@@ -3698,7 +3698,7 @@ function ConseilATS({ variant = "etape4" }) {
   // variant 'etape4' : avant le téléchargement — invitation
   // variant 'etape5' : récap final — semence du retour
   const message = variant === "etape4"
-    ? T("Pour chaque nouvelle offre, refaites un dossier. Un CV adapté à l'offre passe 4 fois mieux les filtres ATS.", "For each new job, create a fresh set. A résumé tailored to the job gets through ATS filters 4× better.")
+    ? T("Pour chaque nouvelle offre, refaites un dossier. Le CV est réajusté au vocabulaire de l'annonce — et aux filtres ATS quand l'entreprise en utilise un.", "For each new job, create a fresh set. Your résumé gets realigned with the posting's wording — and with ATS filters when the company uses one.")
     : T("Pour votre prochaine candidature, revenez avec la nouvelle annonce. Un CV par offre, pas un CV pour toutes : c'est ce qui fait la différence.", "For your next application, come back with the new posting. One résumé per job, not one for all — that's what makes the difference.");
   return (
     <div style={{

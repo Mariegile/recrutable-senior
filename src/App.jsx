@@ -2411,7 +2411,7 @@ function PaymentSuccessBanner({ formule, credits, onClose }) {
 const HERO_ETAPES = [
   { n: 1, icone: "📋", titre: "Collez votre CV", titreEn: "Paste your résumé", texte: "Ou envoyez le PDF — même imparfait, c'est notre travail de l'améliorer.", texteEn: "Or upload the PDF — even a rough one, improving it is our job." },
   { n: 2, icone: "🔍", titre: "Découvrez votre score", titreEn: "See your score", texte: "Analyse gratuite et illimitée face à l'offre d'emploi visée.", texteEn: "Free, unlimited analysis against the job you're targeting." },
-  { n: 3, icone: "⬇️", titre: "Téléchargez votre dossier", titreEn: "Download your documents", texte: "CV optimisé et lettre de motivation, prêts à envoyer.", texteEn: "Optimized résumé and cover letter, ready to send." },
+  { n: 3, icone: "⬇️", titre: "Téléchargez votre dossier", titreEn: "Download your documents", texte: "CV restructuré pour cette offre et lettre assortie, prêts à envoyer.", texteEn: "Résumé restructured for that job and a matching letter, ready to send." },
 ];
 
 function HeroEtapeCard({ etape }) {
@@ -2496,8 +2496,8 @@ function HeroOverlayMobile({ onClose }) {
           </h2>
           <p style={{ margin: "14px 0 22px", fontSize: "16px", lineHeight: 1.6, color: C.textSecondary }}>
             {T(
-              "Avant d'atteindre un recruteur, votre CV est trié par un logiciel. Recrutable l'analyse gratuitement face à l'offre visée, puis le réécrit pour passer les filtres.",
-              "Before it reaches a recruiter, your résumé is screened by software. Recrutable analyzes it for free against the job you're targeting, then rewrites it to get past the filters."
+              "Un recruteur passe moins d'une minute sur un CV. Recrutable compare gratuitement le vôtre à l'offre visée, puis le restructure pour cette offre-là : l'essentiel devient visible tout de suite.",
+              "A recruiter spends less than a minute on a résumé. Recrutable compares yours to the job you're targeting for free, then restructures it for that specific role, so what matters stands out immediately."
             )}
           </p>
         </div>
@@ -2561,15 +2561,15 @@ function HeroAccueil({ onStart }) {
             color: C.textSecondary, maxWidth: "560px",
           }}>
             {T(
-              "Avant d'arriver sous les yeux d'un recruteur, votre CV est trié par un logiciel. ",
-              "Before it ever reaches a recruiter, your résumé is screened by software. "
+              "Un recruteur passe trente à quarante secondes sur un CV — et quand l'entreprise trie par logiciel, encore moins. ",
+              "A recruiter spends thirty to forty seconds on a résumé — and when a company screens with software, even less. "
             )}
             <strong style={{ color: C.text }}>{T(
-              "La majorité des candidatures sont écartées à cette étape, avant même d'être lues.",
-              "Most applications are filtered out at this stage, before anyone even reads them."
+              "Envoyer le même CV à toutes les offres, c'est perdre à chaque fois.",
+              "Sending the same résumé to every job means losing every time."
             )}</strong>{T(
-              " Recrutable mesure gratuitement votre compatibilité avec l'offre visée, puis réécrit votre CV et votre lettre pour passer les filtres — en mettant en valeur ce que vous savez vraiment faire.",
-              " Recrutable measures your match with the target job for free, then rewrites your résumé and letter to get past the filters — highlighting what you truly know how to do."
+              " Recrutable mesure gratuitement votre compatibilité avec l'offre visée, puis restructure votre CV et rédige la lettre assortie pour cette offre-là — en mettant en valeur ce que vous savez vraiment faire.",
+              " Recrutable measures your match with the target job for free, then restructures your résumé and writes the matching letter for that specific role — highlighting what you truly know how to do."
             )}
           </p>
           <button
@@ -2696,7 +2696,7 @@ function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
             margin: "4px 0 0", fontSize: "15px", color: C.textSecondary,
             fontFamily: FONT_SANS, fontWeight: 400,
           }}>
-            {T("Votre CV passe enfin les filtres des recruteurs", "Your résumé finally gets past recruiter filters")}
+            {T("Un CV taillé pour chaque offre que vous visez", "A résumé tailored to every job you target")}
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -3699,7 +3699,7 @@ function ConseilATS({ variant = "etape4" }) {
   // variant 'etape5' : récap final — semence du retour
   const message = variant === "etape4"
     ? T("Pour chaque nouvelle offre, refaites un dossier. Un CV adapté à l'offre passe 4 fois mieux les filtres ATS.", "For each new job, create a fresh set. A résumé tailored to the job gets through ATS filters 4× better.")
-    : T("Pour votre prochaine candidature, revenez avec la nouvelle annonce. Un CV par offre, c'est 4 fois plus de chances de passer les filtres ATS.", "For your next application, come back with the new posting. One résumé per job means 4× more chances of passing ATS filters.");
+    : T("Pour votre prochaine candidature, revenez avec la nouvelle annonce. Un CV par offre, pas un CV pour toutes : c'est ce qui fait la différence.", "For your next application, come back with the new posting. One résumé per job, not one for all — that's what makes the difference.");
   return (
     <div style={{
       background: C.primarySoft,
@@ -5417,7 +5417,7 @@ export default function App() {
 
         {/* ÉTAPE 4 — CV optimisé */}
         {step === 4 && <Card>
-          <PageTitle subtitle={T("Voici votre CV réécrit pour passer les filtres automatiques et marquer le recruteur.", "Here's your rewritten résumé, built to pass automated filters and impress the recruiter.")}>
+          <PageTitle subtitle={T("Voici votre CV restructuré pour cette offre : l'essentiel visible en trente secondes.", "Here's your résumé restructured for this job: what matters, visible in thirty seconds.")}>
             {T("Étape 4 : Votre CV optimisé", "Step 4: Your optimized résumé")}
           </PageTitle>
 

@@ -80,7 +80,7 @@ function stripeUrl(base) {
   }
   return url;
 }
-const SUPPORT_EMAIL   = "metamax973@gmail.com";
+const SUPPORT_EMAIL   = "recrutable@proton.me";
 
 // ── Coût en crédits par action ─────────────────────────────────────
 // ── Coût en crédits par action ─────────────────────────────────────

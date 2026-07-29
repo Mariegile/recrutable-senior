@@ -3640,12 +3640,12 @@ function PactePersonnalisation({ onPersonnaliser, dejaCorrige }) {
             margin: "8px 0 12px", fontSize: "14.5px", color: C.text,
             lineHeight: 1.6,
           }}>
-            {T(<>Les recruteurs reçoivent jusqu'à <strong>15 CV identiques générés par IA</strong> pour
-            une même offre. <strong>67 % d'entre eux</strong> écartent ces candidatures.
-            Votre touche personnelle est ce qui fait la différence aux yeux d'un humain.</>,
-            <>Recruiters receive up to <strong>15 identical AI-generated résumés</strong> for
-            a single job. <strong>67% of them</strong> reject those applications.
-            Your personal touch is what makes the difference to a human reader.</>)}
+            {T(<>Les recruteurs voient passer <strong>des dizaines de CV générés par IA</strong> qui se
+            ressemblent tous. Ce qui vous distingue, c'est ce que la machine ne peut pas inventer :
+            <strong> vos mots, vos exemples, vos résultats.</strong> Relisez, ajustez, personnalisez.</>,
+            <>Recruiters see <strong>dozens of AI-generated résumés</strong> that all look alike.
+            What sets you apart is what no machine can invent:
+            <strong> your words, your examples, your results.</strong> Review it, adjust it, make it yours.</>)}
           </p>
           <div style={{
             background: "rgba(255,255,255,0.75)",

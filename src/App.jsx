@@ -2746,7 +2746,7 @@ function CreditBadge({ credits, onClick }) {
       <span style={{ fontSize: "18px" }}>🎟️</span>
       <div style={{ textAlign: "left" }}>
         <div style={{ fontSize: "12px", color: C.textMuted, fontFamily: FONT_SANS, fontWeight: 500, lineHeight: 1 }}>
-          {T("Actions IA restantes", "AI actions left")}
+          {T("Diagnostics restants", "Diagnostics left")}
         </div>
         <div style={{ fontSize: "20px", color, fontFamily: FONT_SERIF, fontWeight: 700, lineHeight: 1.2, display: "flex", alignItems: "baseline", gap: "6px" }}>
           {credits}
@@ -4462,7 +4462,7 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
             {T("Il vous reste actuellement", "You currently have")}
           </div>
           <div style={{ fontSize: "26px", color: C.primary, fontFamily: FONT_SERIF, fontWeight: 700, lineHeight: 1.2 }}>
-            {credits} <span style={{ fontSize: "15px", fontWeight: 500, color: C.textSecondary }}>{T(`action${credits > 1 ? "s" : ""} IA`, `AI action${credits > 1 ? "s" : ""}`)}</span>
+            {credits} <span style={{ fontSize: "15px", fontWeight: 500, color: C.textSecondary }}>{T(`diagnostic${credits > 1 ? "s" : ""}`, `diagnostic${credits > 1 ? "s" : ""}`)}</span>
           </div>
         </div>
 
@@ -4824,7 +4824,7 @@ export default function App() {
       return;
     }
     if (credits < CREDITS.REWRITE) {
-      setCvOptError(T(`Il vous faut 1 action IA pour la réécriture. Achetez la recharge à 2,99 € (3 dossiers complets).`, `You need 1 AI action to rewrite. Buy the top-up at €2.99 (3 complete sets).`));
+      setCvOptError(T(`Il vous faut 1 diagnostic pour la réécriture. Achetez la recharge à 2,99 € (3 dossiers complets).`, `You need 1 diagnostic to rewrite. Buy the top-up at €2.99 (3 complete sets).`));
       return;
     }
     setLoading(true); setLoadingMsg(T("Réécriture de votre CV", "Rewriting your résumé")); setStep(4);
@@ -4935,7 +4935,7 @@ export default function App() {
   const doLettre = async () => {
     if (loading) return;
     if (credits < CREDITS.LETTRE) {
-      setLettreError(T(`Il vous faut 1 action IA pour la lettre. Achetez la recharge à 2,99 €.`, `You need 1 AI action for the letter. Buy the top-up at €2.99.`));
+      setLettreError(T(`Il vous faut 1 diagnostic pour la lettre. Achetez la recharge à 2,99 €.`, `You need 1 diagnostic for the letter. Buy the top-up at €2.99.`));
       return;
     }
     setLoading(true); setLoadingMsg(T("Rédaction de votre lettre de motivation", "Writing your cover letter")); setStep(5);
@@ -5359,7 +5359,7 @@ export default function App() {
               <SecondaryBtn onClick={() => setStep(2)}>{T("← Modifier l'offre", "← Edit the job offer")}</SecondaryBtn>
               <div style={{ flex: 1, minWidth: "240px" }}>
                 <PrimaryBtn onClick={doCvOpt} loading={loading} icon="✨" variant="accent">
-                  {T("Réécrire mon CV (1 action IA)", "Rewrite my résumé (1 AI action)")}
+                  {T("Réécrire mon CV (1 diagnostic)", "Rewrite my résumé (1 diagnostic)")}
                 </PrimaryBtn>
               </div>
             </div>
@@ -5377,7 +5377,7 @@ export default function App() {
                   {T("Vous envisagez une reconversion ?", "Considering a career change?")}
                 </h3>
                 <p style={{ margin: "6px 0 0", fontSize: "15px", color: C.textSecondary, lineHeight: 1.6 }}>
-                  {T("Découvrez 3 métiers où votre expérience devient un véritable atout (1 action IA).", "Discover 3 roles where your experience becomes a real asset (1 AI action).")}
+                  {T("Découvrez 3 métiers où votre expérience devient un véritable atout (1 diagnostic).", "Discover 3 roles where your experience becomes a real asset (1 diagnostic).")}
                 </p>
               </div>
 
@@ -5700,7 +5700,7 @@ export default function App() {
               fontSize: "22px", fontWeight: 700, color: C.text,
               fontFamily: FONT_SERIF, margin: "0 0 10px",
             }}>
-              {T("Vous n'avez pas encore d'actions IA", "You don't have any AI actions yet")}
+              {T("Vous n'avez pas encore de diagnostics", "You don't have any diagnostics yet")}
             </h3>
             <p style={{
               fontSize: "16px", color: C.textSecondary,

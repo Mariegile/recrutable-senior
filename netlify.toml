@@ -13,3 +13,7 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Ping quotidien de Supabase (evite la mise en pause de l'offre gratuite).
+[functions."keepalive-supabase"]
+  schedule = "@daily"

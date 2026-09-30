@@ -25,18 +25,15 @@ function tg(fr, en) { return CURRENT_LANG === "en" && en !== undefined ? en : fr
 
 function detectLang() {
   try {
+    // Seul un choix explicite (onglet FR/EN, mémorisé) fait passer en anglais.
+    // Par défaut : français, quelle que soit la langue du navigateur. Cela évite
+    // notamment que les robots des moteurs (navigateur en anglais) indexent la
+    // version anglaise d'un site destiné au marché français.
     const saved = localStorage.getItem(LANG_KEY);
     if (saved === "fr" || saved === "en") { CURRENT_LANG = saved; return saved; }
-    // Détection de la locale primaire (troncature type "fr-CA" -> "fr").
-    const nav = (navigator.language || navigator.userLanguage || "en").toLowerCase();
-    const base = nav.split("-")[0];
-    // Règle de repli : seul le français reste en français ; toute autre
-    // locale non prise en charge (de, es, it...) bascule sur l'anglais,
-    // langue universelle des ATS internationaux.
-    const res = base === "fr" ? "fr" : "en";
-    CURRENT_LANG = res;
-    return res;
-  } catch { return "fr"; }
+    CURRENT_LANG = "fr";
+    return "fr";
+  } catch { CURRENT_LANG = "fr"; return "fr"; }
 }
 
 const LangContext = createContext({ lang: "fr", setLang: () => {} });
@@ -2454,9 +2451,11 @@ function HeroOverlayMobile({ onClose }) {
         {/* Barre du haut : marque + croix pour entrer dans l'application */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "22px" }}>
           <div>
-            <span style={{ fontFamily: FONT_SERIF, fontWeight: 700, fontSize: "22px", color: C.primary }}>
-              Recrutable
-            </span>
+            <img
+              src="/logo-recrutable.svg" alt="Recrutable"
+              width="154" height="24"
+              style={{ display: "block", height: "24px", width: "auto" }}
+            />
             {lang === "en" && (
               <div style={{
                 fontSize: "11px", fontWeight: 700, color: C.accent,

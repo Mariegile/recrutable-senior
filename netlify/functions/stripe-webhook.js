@@ -30,20 +30,36 @@ function creditsPourMontant(cents) {
   return 0;
 }
 
+// Cherche UN profil par colonne. Toute erreur Supabase (base en pause,
+// réseau, droits) est levée : le handler renvoie alors 500 et Stripe
+// retente, au lieu de conclure à tort « aucun profil » (200 = paiement perdu).
+// 0 résultat -> null ; plusieurs résultats -> null + alerte (ambigu, manuel).
+async function chercherProfil(colonne, valeur) {
+  const { data, error } = await supabase
+    .from("profils").select("id").eq(colonne, valeur).limit(2);
+  if (error) throw new Error(`profils.${colonne}: ${error.message}`);
+  if (!data || data.length === 0) return null;
+  if (data.length > 1) {
+    console.warn(`Plusieurs profils pour ${colonne}, crédit manuel requis:`, valeur);
+    return null;
+  }
+  return data[0].id;
+}
+
 async function trouverProfil({ userId, customerId, email }) {
-  if (userId) {
-    const { data } = await supabase.from("profils").select("id").eq("id", userId).single();
-    if (data) return data.id;
+  // Un client_reference_id qui n'est pas un UUID ferait échouer la requête
+  // (22P02) en boucle : on l'ignore et on passe aux autres critères.
+  if (userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+    const id = await chercherProfil("id", userId);
+    if (id) return id;
   }
   if (customerId) {
-    const { data } = await supabase
-      .from("profils").select("id").eq("stripe_customer_id", customerId).single();
-    if (data) return data.id;
+    const id = await chercherProfil("stripe_customer_id", customerId);
+    if (id) return id;
   }
   if (email) {
-    const { data } = await supabase
-      .from("profils").select("id").eq("email", email).single();
-    if (data) return data.id;
+    const id = await chercherProfil("email", email);
+    if (id) return id;
   }
   return null;
 }

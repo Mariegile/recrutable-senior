@@ -2220,6 +2220,9 @@ const GLOBAL_STYLES = `
     .app-header h1 {
       font-size: 22px !important;
     }
+    .app-header-logo {
+      height: 24px !important;
+    }
     .app-header-tagline {
       font-size: 13px !important;
       margin-top: 2px !important;
@@ -2488,12 +2491,12 @@ function HeroOverlayMobile({ onClose }) {
           }}>
             ✦ {T("Optimisé pour chaque offre d'emploi", "Optimized for every job offer")}
           </div>
-          <h2 style={{
+          <h1 style={{
             margin: 0, fontFamily: FONT_SERIF, fontWeight: 700, fontSize: "33px",
             color: C.text, letterSpacing: "-0.02em", lineHeight: 1.15,
           }}>
             {T("Votre expérience mérite d'être ", "Your experience deserves to be ")}<span style={{ color: C.accent }}>{T("vue", "seen")}</span>.
-          </h2>
+          </h1>
           <p style={{ margin: "14px 0 22px", fontSize: "16px", lineHeight: 1.6, color: C.textSecondary }}>
             {T(
               "Un recruteur passe moins d'une minute sur un CV, et beaucoup d'entreprises le font d'abord trier par un logiciel (ATS). Recrutable compare gratuitement le vôtre à l'offre visée, puis le restructure pour cette offre-là.",
@@ -2550,12 +2553,12 @@ function HeroAccueil({ onStart }) {
           }}>
             ✦ {T("CV, lettre et score de compatibilité, optimisés pour chaque offre", "Résumé, cover letter and match score, optimized for every job")}
           </div>
-          <h2 className="hero-title" style={{
+          <h1 className="hero-title" style={{
             margin: 0, fontFamily: FONT_SERIF, fontWeight: 700,
             color: C.text, letterSpacing: "-0.02em", lineHeight: 1.12,
           }}>
             {T("Votre expérience mérite d'être ", "Your experience deserves to be ")}<span style={{ color: C.accent }}>{T("vue", "seen")}</span>.
-          </h2>
+          </h1>
           <p className="hero-para" style={{
             margin: "18px 0 26px", fontSize: "17.5px", lineHeight: 1.65,
             color: C.textSecondary, maxWidth: "560px",
@@ -2676,12 +2679,13 @@ function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px",
       }}>
         <div>
-          <h1 style={{
-            margin: 0, fontSize: "28px", fontWeight: 700,
-            fontFamily: FONT_SERIF, color: C.primary, letterSpacing: "-0.01em",
-          }}>
-            Recrutable
-          </h1>
+          {/* Logo (wordmark). Le H1 de la page porte la promesse, dans le hero. */}
+          <img
+            src="/logo-recrutable.svg" alt="Recrutable"
+            className="app-header-logo"
+            width="192" height="30"
+            style={{ display: "block", height: "30px", width: "auto" }}
+          />
           {/* Sous-marque anglophone : visible uniquement en mode EN */}
           {lang === "en" && (
             <div style={{

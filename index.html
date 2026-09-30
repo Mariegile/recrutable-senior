@@ -1,13 +1,84 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>recrutable-senior</title>
+    <title>Recrutable : un CV adapté à chaque offre (45-65 ans)</title>
+    <meta name="description" content="Analysez gratuitement votre CV face à une offre d'emploi, puis obtenez un CV et une lettre adaptés à ce poste. Pensé pour les candidats de 45 à 65 ans." />
+    <link rel="canonical" href="https://recrutable.com/" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#1B3A5C" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Open Graph / réseaux sociaux -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Recrutable" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:url" content="https://recrutable.com/" />
+    <meta property="og:title" content="Recrutable : un CV adapté à chaque offre (45-65 ans)" />
+    <meta property="og:description" content="Analysez gratuitement votre CV face à une offre d'emploi, puis obtenez un CV et une lettre adaptés à ce poste. Pensé pour les candidats de 45 à 65 ans." />
+    <meta property="og:image" content="https://recrutable.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Recrutable : un CV adapté à chaque offre d'emploi" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://recrutable.com/og-image.png" />
+    <meta name="twitter:title" content="Recrutable : un CV adapté à chaque offre (45-65 ans)" />
+    <meta name="twitter:description" content="Analysez gratuitement votre CV face à une offre d'emploi, puis obtenez un CV et une lettre adaptés à ce poste. Pensé pour les candidats de 45 à 65 ans." />
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Recrutable",
+      "url": "https://recrutable.com/",
+      "inLanguage": "fr-FR",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web",
+      "description": "Analyse gratuite de la compatibilité d'un CV avec une offre d'emploi, puis réécriture du CV et de la lettre de motivation pour cette offre.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR", "description": "Analyse de compatibilité gratuite et illimitée" },
+      "email": "recrutable@proton.me",
+      "logo": "https://recrutable.com/icon-512.png"
+    }
+    </script>
+
+    <style>
+      /* Contenu statique lisible sans JavaScript (robots, aperçus).
+         React remplace entièrement #root au montage. */
+      .seo-static { max-width: 780px; margin: 0 auto; padding: 48px 24px; font-family: Georgia, 'Times New Roman', serif; color: #1A1612; background: #F5F0E8; line-height: 1.6; text-align: left; }
+      .seo-static h1 { font-size: 34px; line-height: 1.15; color: #1B3A5C; margin: 0 0 14px; }
+      .seo-static h2 { font-size: 22px; color: #1B3A5C; margin: 32px 0 10px; }
+      .seo-static p, .seo-static li { font-family: system-ui, 'Segoe UI', Roboto, sans-serif; font-size: 17px; color: #4A4138; }
+      .seo-static a { color: #A85D2C; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main class="seo-static">
+        <h1>Un CV adapté à chaque offre d'emploi</h1>
+        <p>Un recruteur passe trente à quarante secondes sur un CV, et de nombreuses entreprises le font d'abord lire par un logiciel de tri (ATS). Envoyer le même CV à toutes les offres, c'est perdre à chaque fois. Recrutable mesure gratuitement la compatibilité de votre CV avec l'offre visée, puis restructure votre CV et rédige la lettre assortie pour ce poste précis.</p>
+        <p>Pensé pour les candidats expérimentés de 45 à 65 ans : lecture confortable, langage simple, votre expérience mise en valeur.</p>
+
+        <h2>Comment ça marche</h2>
+        <ol>
+          <li><strong>Collez votre CV</strong> ou envoyez le PDF, même imparfait.</li>
+          <li><strong>Découvrez votre score</strong> : compatibilité avec l'offre visée et lisibilité par les filtres ATS. Gratuit et illimité.</li>
+          <li><strong>Téléchargez votre dossier</strong> : CV restructuré pour cette offre et lettre de motivation assortie, prêts à envoyer.</li>
+        </ol>
+
+        <h2>Gratuit pour commencer</h2>
+        <p>L'analyse de compatibilité est gratuite, illimitée et sans carte bancaire. La réécriture du CV et la lettre de motivation fonctionnent avec des crédits, à partir de 2,99 €.</p>
+
+        <h2>Contact</h2>
+        <p>Une question : <a href="mailto:recrutable@proton.me">recrutable@proton.me</a></p>
+
+        <noscript><p><strong>Recrutable a besoin de JavaScript pour fonctionner. Activez-le dans votre navigateur pour analyser votre CV.</strong></p></noscript>
+      </main>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

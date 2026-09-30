@@ -1,9 +1,30 @@
 {
   "short_name": "Recrutable",
-  "name": "Recrutable — Édition Seniors",
-  "start_url": ".",
+  "name": "Recrutable : un CV adapté à chaque offre",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#F5F0E8",
-  "background_color": "#F5F0E8"
+  "theme_color": "#1B3A5C",
+  "background_color": "#F5F0E8",
+  "lang": "fr",
+  "description": "Analyse gratuite de votre CV face à une offre, puis CV et lettre adaptés à ce poste.",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
 }
-

@@ -39,18 +39,20 @@ export function restaurerAccents(motNorm, texteSource) {
 }
 
 // Transforme les mots-clés absents du CV en questions lisibles pour le
-// candidat : un mot isolé est complété par son voisin dans l'offre quand ce
-// voisin est lui aussi un mot-clé (« normes » -> « normes HACCP »,
-// « restauration » + « collective » -> « restauration collective »).
+// candidat. Deux mots absents voisins dans une même ligne de l'offre sont
+// réunis (« restauration » + « collective » -> « restauration collective »).
+// Un mot absent collé à un mot-clé DÉJÀ présent dans le CV (« normes »
+// devant « HACCP », « alimentaires » après « régimes ») est écarté : la
+// notion est déjà couverte, la question serait redondante.
 // Les mots présents uniquement dans la 1re ligne (intitulé, employeur) sont
-// écartés : le titre est traité à part et le nom de l'employeur n'est pas
-// une compétence.
+// écartés : le titre est traité à part et l'employeur n'est pas une compétence.
 export function preparerQuestions(manquants, presents, texteOffre) {
   const lignes = String(texteOffre || "").split(/\n/).filter(l => l.trim());
   const corps = lignes.slice(1);
-  const mots = corps.flatMap(l => l.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || [])
-    .map(m => m.replace(/^[ldLD]['’]/, ""));
-  const cles = new Set([...manquants, ...presents].flatMap(k => sansAccents(k).split(/\s+/)));
+  const motsParLigne = corps.map(l => (l.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || [])
+    .map(m => m.replace(/^[ldLD]['’]/, "")));
+  const absents = new Set(manquants.flatMap(k => sansAccents(k).split(/\s+/)));
+  const couverts = new Set(presents.flatMap(k => sansAccents(k).split(/\s+/)));
   const corpsNorm = " " + sansAccents(corps.join(" ")).replace(/[^a-z0-9]+/g, " ") + " ";
   const forme = (m) => (m.length >= 2 && m === m.toUpperCase() && /\p{L}/u.test(m)) ? m : m.toLowerCase();
   const out = [];
@@ -59,10 +61,12 @@ export function preparerQuestions(manquants, presents, texteOffre) {
     if (!corpsNorm.includes(" " + kn.replace(/[^a-z0-9]+/g, " ").trim() + " ")) continue;
     let phrase = k;
     if (!/\s/.test(k)) {
+      const mots = motsParLigne.find(ms => ms.some(m => sansAccents(m) === kn)) || [];
       const i = mots.findIndex(m => sansAccents(m) === kn);
-      const suiv = mots[i + 1], prec = mots[i - 1];
-      if (i >= 0 && suiv && cles.has(sansAccents(suiv)) && sansAccents(suiv) !== kn) phrase = `${forme(mots[i])} ${forme(suiv)}`;
-      else if (i >= 0 && prec && cles.has(sansAccents(prec)) && sansAccents(prec) !== kn) phrase = `${forme(prec)} ${forme(mots[i])}`;
+      const suiv = mots[i + 1] && sansAccents(mots[i + 1]), prec = mots[i - 1] && sansAccents(mots[i - 1]);
+      if ((suiv && couverts.has(suiv)) || (prec && couverts.has(prec))) continue;
+      if (suiv && absents.has(suiv) && suiv !== kn) phrase = `${forme(mots[i])} ${forme(mots[i + 1])}`;
+      else if (prec && absents.has(prec) && prec !== kn) phrase = `${forme(mots[i - 1])} ${forme(mots[i])}`;
     }
     if (!out.some(p => sansAccents(p) === sansAccents(phrase))) out.push(phrase);
   }

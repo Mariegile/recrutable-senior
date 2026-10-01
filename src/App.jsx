@@ -1290,8 +1290,8 @@ function detecterPointsForts(texteCV) {
   try {
     const chrono = extraireChronologie(texteCV);
     if (chrono.anneesExperience && chrono.anneesExperience >= 2) {
-      points.push(tg(`${chrono.anneesExperience} années d'expérience détectées, parcours daté et vérifiable`,
-                     `${chrono.anneesExperience} years of experience detected, dated and verifiable career path`));
+      points.push(tg(`${Math.floor(chrono.anneesExperience)} années d'expérience détectées, parcours daté et vérifiable`,
+                     `${Math.floor(chrono.anneesExperience)} years of experience detected, dated and verifiable career path`));
     }
   } catch {}
   // Structure : sections clés présentes
@@ -1471,9 +1471,12 @@ function scanNiveauDiplome(texteNorm) {
   let niveau = null, libelle = null;
   for (const d of DIPLOMES_EQF) {
     for (const mot of d.mots) {
-      // « maîtrise de / des / impérative des... » = savoir-faire, pas le diplôme
-      const pasSavoirFaire = mot === "maitrise" ? "(?!\\s+(?:[a-z]+\\s+)?(?:de|des|du|d')(?![a-z]))" : "";
-      const rx = new RegExp(`(^|[^a-z0-9+])${mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}${pasSavoirFaire}([^a-z0-9]|$)`);
+      // « Maîtrise » n'est le diplôme que dans un contexte de diplôme
+      // (« titulaire d'une maîtrise », « maîtrise en droit ») ; sinon
+      // « maîtrise ERP », « maîtrise d'Excel » = savoir-faire.
+      const rx = mot === "maitrise"
+        ? /(?:titulaire d'une|diplome d'une|niveau|une|bac\+4,?)\s+maitrise\b|\bmaitrise\s+(?:en|\(bac)/
+        : new RegExp(`(^|[^a-z0-9+])${mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`);
       if (rx.test(texteNorm)) {
         if (niveau === null || d.niveau > niveau) { niveau = d.niveau; libelle = mot; }
         break;
@@ -1506,7 +1509,7 @@ function analyserDiplome(texteOffre, texteCV) {
 const MARQUEURS_EXIGENCE_DURE = ["imperatif", "imperative", "exige", "exigee", "exigees", "indispensable", "indispensables", "requis", "requise", "requises", "obligatoire", "obligatoires", "vous devez", "maitrise parfaite de", "maitrise imperative", "experience exigee", "necessaire", "necessaires", "vous justifiez obligatoirement", "il est indispensable de", "maitrise absolue", "imperativement", "obligatoirement", "condition sine qua non", "vous maitrisez parfaitement", "vous devez imperativement", "minimum", "maitrise de", "must have", "must-have", "required", "mandatory", "essential", "proven", "you must", "is required", "fluent in", "must demonstrate", "is essential", "are required", "proven experience", "you will need", "mandatory requirement", "must possess", "minimum of", "is mandatory", "solid understanding of", "perfect mastery of", "strong experience in", "must be able to", "demonstrated ability", "has to be", "at least", "needs to", "necessary"];
 const MARQUEURS_EXIGENCE_SOUHAITEE = ["serait un plus", "idealement", "apprecie", "appreciee", "apprecies", "souhaite", "souhaitee", "souhaitees", "un atout", "notions de", "fortement apprecie", "serait grandement apprecie", "constitue un plus", "un veritable atout", "des notions de", "serait appreciee", "idealement diplome", "est un plus", "fortement souhaite", "serait un veritable avantage", "de preference", "optionnel", "bonus", "nice to have", "nice-to-have", "a plus", "preferred", "ideally", "familiarity with", "would be an asset", "strongly preferred", "is desired", "plus but not required", "is a plus", "experience is preferred", "highly appreciated", "not required but a plus", "is an advantage", "would be beneficial", "familiarity is a plus", "desirable", "would be"];
 // Mots de marquage : jamais des mots-clés en eux-mêmes (exclus de l'extraction)
-const MOTS_MARQUEURS = new Set(["exige", "exigee", "exigees", "exigence", "exigences", "requis", "requise", "requises", "required", "obligatoire", "obligatoires", "mandatory", "imperatif", "imperative", "imperativement", "obligatoirement", "indispensable", "indispensables", "essential", "necessaire", "necessaires", "necessary", "minimum", "maitrise", "maitrisez", "proven", "preferred", "ideally", "idealement", "apprecie", "appreciee", "apprecies", "souhaite", "souhaitee", "souhaitees", "atout", "atouts", "notions", "bonus", "desirable", "familiarity", "optionnel", "preference", "profil", "recherche", "recherchons", "justifiez", "titulaire", "condition", "demonstrated", "possess", "diplome", "diplomes", "ecole", "ecoles", "experience", "experiences", "serait", "mission", "missions", "poste", "postes", "annee", "annees", "formation", "formations", "niveau", "connaissance", "connaissances", "justifier", "candidat", "candidate", "idealement"]);
+const MOTS_MARQUEURS = new Set(["exige", "exigee", "exigees", "exigence", "exigences", "requis", "requise", "requises", "required", "obligatoire", "obligatoires", "mandatory", "imperatif", "imperative", "imperativement", "obligatoirement", "indispensable", "indispensables", "essential", "necessaire", "necessaires", "necessary", "minimum", "maitrise", "maitrisez", "proven", "preferred", "ideally", "idealement", "apprecie", "appreciee", "apprecies", "souhaite", "souhaitee", "souhaitees", "atout", "atouts", "notions", "bonus", "desirable", "familiarity", "optionnel", "preference", "profil", "recherche", "recherchons", "justifiez", "titulaire", "condition", "demonstrated", "possess", "diplome", "diplomes", "entreprise", "entreprises", "pourvoir", "immediatement", "plein", "partiel", "societe", "ecole", "ecoles", "experience", "experiences", "serait", "mission", "missions", "poste", "postes", "annee", "annees", "formation", "formations", "niveau", "connaissance", "connaissances", "justifier", "candidat", "candidate", "idealement"]);
 
 // Classe chaque mot-clé selon le contexte de sa ligne dans l'offre.
 function classifierExigences(texteOffre, motsCles) {
@@ -1528,7 +1531,9 @@ function extraireTitrePoste(texteOffre) {
   let l = lignes[0];
   const m = l.match(/(?:recherche|recrutons|recrute|hiring|looking for|seeking)\s+(?:un |une |des |a |an )?(.+)/i);
   if (m) l = m[1];
-  l = l.replace(/\(.*?\)/g, " ")
+  // « Chef de cuisine H/F, Résidence X » : l'employeur suit la virgule ou le séparateur
+  l = l.replace(/\(.*?\)/g, " ").split(/\s*[,|•·–—]\s*|\s+-\s+/).map(x => x.trim()).filter(Boolean)[0] || l;
+  l = l
        .replace(/\b(h\/f|f\/h|m\/f|f\/m|cdi|cdd|stage|alternance|full[- ]time|part[- ]time)\b/gi, " ")
        .replace(/[|•·–—-]+/g, " ").replace(/\s+/g, " ").trim();
   if (l.length > 70) l = l.split(" ").slice(0, 8).join(" ");
@@ -5220,7 +5225,7 @@ export default function App() {
                     {analyse.experienceCV != null && <>
                       {", "}{T("détectée dans votre CV : ", "detected in your résumé: ")}
                       <strong style={{ color: analyse.experienceCV >= analyse.experienceRequise.min - 1 ? C.success : C.error }}>
-                        {analyse.experienceCV} {T("ans", "years")} {analyse.experienceCV >= analyse.experienceRequise.min - 1 ? "✓" : ""}
+                        {Math.floor(analyse.experienceCV)} {T("ans", "years")} {analyse.experienceCV >= analyse.experienceRequise.min - 1 ? "✓" : ""}
                       </strong>
                       {analyse.experienceCV < analyse.experienceRequise.min - 1 && T(", datez clairement vos expériences si ce chiffre est sous-estimé", ", date your roles clearly if this is underestimated")}
                     </>}

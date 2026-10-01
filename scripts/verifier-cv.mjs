@@ -36,7 +36,10 @@ test("questions Oui/Non : expressions de l'offre, pas le nom de l'employeur", ()
   const q = preparerQuestions(
     ["normes", "contrôle de gestion", "chef", "restauration", "collective", "alimentaires", "glycines", "ehpad"],
     ["haccp", "régimes"], OFFRE);
-  assert.deepEqual(q, ["normes HACCP", "contrôle de gestion", "restauration collective", "régimes alimentaires"]);
+  // « normes » (devant HACCP) et « alimentaires » (après régimes) : notions déjà dans le CV
+  assert.deepEqual(q, ["contrôle de gestion", "restauration collective"]);
+  // pas de fusion à cheval sur deux lignes
+  assert.deepEqual(preparerQuestions(["entreprise", "anglais"], [], "Titre\n- 5 ans en entreprise\n- anglais"), ["entreprise", "anglais"]);
 });
 
 test("la comparaison interne reste désaccentuée", () => {

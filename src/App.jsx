@@ -1795,7 +1795,8 @@ function cvVersTexte(cv) {
 function genererCvHtml(cv, secteur, opts = {}) {
   const { couleurCustom = null, ...reste } = opts;
   // Thème : couleur personnalisée choisie par l'utilisateur, sinon thème du secteur
-  const base = THEMES[secteur] || THEMES.default;
+  // Mode automatique : bleu marine pour tous les secteurs (seule la police suit le secteur)
+  const base = { ...THEMES.default, font: (THEMES[secteur] || THEMES.default).font };
   const t = couleurCustom
     ? { primary: couleurCustom.primary, accent: couleurCustom.accent, font: base.font }
     : base;
@@ -2432,8 +2433,8 @@ function HeroOverlayMobile({ onClose }) {
           </h1>
           <p style={{ margin: "14px 0 22px", fontSize: "16px", lineHeight: 1.6, color: C.textSecondary }}>
             {T(
-              "Un recruteur passe moins d'une minute sur un CV, et beaucoup d'entreprises le font d'abord trier par un logiciel (ATS). Recrutable compare gratuitement le vôtre à l'offre visée, puis le restructure pour cette offre-là.",
-              "A recruiter spends less than a minute on a résumé, and many companies screen it with software (ATS) first. Recrutable compares yours to the job you're targeting for free, then restructures it for that specific role."
+              "Un recruteur parcourt un CV très vite, et beaucoup d'entreprises le font d'abord trier par un logiciel (ATS). Recrutable compare gratuitement le vôtre à l'offre visée, puis le restructure pour cette offre-là.",
+              "A recruiter skims a résumé very quickly, and many companies screen it with software (ATS) first. Recrutable compares yours to the job you're targeting for free, then restructures it for that specific role."
             )}
           </p>
         </div>
@@ -2497,8 +2498,8 @@ function HeroAccueil({ onStart }) {
             color: C.textSecondary, maxWidth: "560px",
           }}>
             {T(
-              "Un recruteur passe trente à quarante secondes sur un CV. Et dans les entreprises équipées d'un logiciel de tri (ATS), deux grandes entreprises sur trois, il faut d'abord passer la machine. ",
-              "A recruiter spends thirty to forty seconds on a résumé. And in companies using screening software (ATS), two out of three large firms, you have to get past the machine first. "
+              "Un recruteur parcourt un CV très vite. Et dans les entreprises équipées d'un logiciel de tri (ATS), il faut d'abord passer la machine. ",
+              "A recruiter skims a résumé very quickly. And in companies using screening software (ATS), you have to get past the machine first. "
             )}
             <strong style={{ color: C.text }}>{T(
               "Envoyer le même CV à toutes les offres, c'est perdre à chaque fois.",
@@ -5152,7 +5153,7 @@ export default function App() {
 
           <DualInput
             label={T("Collez l'annonce ou envoyez son PDF", "Paste the posting or upload its PDF")}
-            hint={T("Vous trouverez le texte sur Pôle Emploi, Indeed, LinkedIn, ou directement sur le site de l'entreprise.", "You'll find the text on Indeed, LinkedIn, or the company's own website.")}
+            hint={T("Vous trouverez le texte sur France Travail, Indeed, LinkedIn, ou directement sur le site de l'entreprise.", "You'll find the text on Indeed, LinkedIn, or the company's own website.")}
             textValue={offreText} onTextChange={setOffreText}
             pdfFile={offrePdf} onPdfChange={setOffrePdf}
             pdfInfo={offrePdfInfo} onPdfInfo={setOffrePdfInfo}
@@ -5398,7 +5399,7 @@ export default function App() {
 
         {/* ÉTAPE 4, CV optimisé */}
         {step === 4 && <Card>
-          <PageTitle subtitle={T("Voici votre CV restructuré pour cette offre : l'essentiel visible en trente secondes.", "Here's your résumé restructured for this job: what matters, visible in thirty seconds.")}>
+          <PageTitle subtitle={T("Voici votre CV restructuré pour cette offre : l'essentiel visible au premier coup d'œil.", "Here's your résumé restructured for this job: what matters, visible at a glance.")}>
             {T("Étape 4 : Votre CV optimisé", "Step 4: Your optimized résumé")}
           </PageTitle>
 

@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback, createContext, useContext } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { restaurerAccents, nettoyerTiretsCv, aplatirCompetences, preparerQuestions } from "./cvTexte.js";
+import { genererCvHtmlFr } from "./cvModele.js";
 
 // ── Connexion Supabase (comptes + credits cote serveur) ─────────────
 const SUPABASE_URL = "https://grspvuktagvdyjdfowyc.supabase.co";
@@ -216,11 +218,6 @@ function nettoyerTexte(txt) {
 function limiterTexte(txt, max) {
   const clean = nettoyerTexte(txt);
   return { texte: clean.length <= max ? clean : clean.substring(0, max), tronque: clean.length > max };
-}
-
-function envelopper(balise, contenu) {
-  if (!contenu?.trim()) return "";
-  return `<${balise}>\n${contenu}\n</${balise}>`;
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1474,7 +1471,9 @@ function scanNiveauDiplome(texteNorm) {
   let niveau = null, libelle = null;
   for (const d of DIPLOMES_EQF) {
     for (const mot of d.mots) {
-      const rx = new RegExp(`(^|[^a-z0-9+])${mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`);
+      // « maîtrise de / des / impérative des... » = savoir-faire, pas le diplôme
+      const pasSavoirFaire = mot === "maitrise" ? "(?!\\s+(?:[a-z]+\\s+)?(?:de|des|du|d')(?![a-z]))" : "";
+      const rx = new RegExp(`(^|[^a-z0-9+])${mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}${pasSavoirFaire}([^a-z0-9]|$)`);
       if (rx.test(texteNorm)) {
         if (niveau === null || d.niveau > niveau) { niveau = d.niveau; libelle = mot; }
         break;
@@ -1492,7 +1491,7 @@ function analyserDiplome(texteOffre, texteCV) {
   if (requis.niveau === null) return null;
   const cvNorm = texteCV.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const cv = scanNiveauDiplome(cvNorm);
-  return { niveau: requis.niveau, libelle: requis.libelle, present: cv.niveau !== null && cv.niveau >= requis.niveau };
+  return { niveau: requis.niveau, libelle: restaurerAccents(requis.libelle, texteOffre), present: cv.niveau !== null && cv.niveau >= requis.niveau };
 }
 
 
@@ -1623,14 +1622,23 @@ function analyserAlgo(texteCV, texteOffre) {
   const offreEn = (texteOffre.match(/\b(english|fluent|required|experience|years|skills|management|level)\b/gi) || []).length;
   const formatRecommande = offreEn >= 3 ? "international" : "francais";
   const langueRecommandee = offreEn >= 5 ? "anglais" : "francais";
+  // Les mots-clés sont comparés en désaccentué ; pour l'affichage (et l'envoi
+  // au modèle) on reprend leur forme accentuée telle qu'écrite dans l'offre.
+  const affichage = (liste) => [...new Set(liste.map(m => restaurerAccents(m, texteOffre)))];
   return {
     score,
     secteur,
     formatRecommande,
     langueRecommandee,
-    motsPresents: [...cmpDurs.presents, ...cmpAutres.presents].slice(0, 10),
-    motsManquants: cmpAutres.manquants.slice(0, 10),
-    motsManquantsCritiques: critiquesManquants.slice(0, 8),
+    motsPresents: affichage([...cmpDurs.presents, ...cmpAutres.presents]).slice(0, 10),
+    motsManquants: affichage(cmpAutres.manquants).slice(0, 10),
+    motsManquantsCritiques: affichage(critiquesManquants).slice(0, 8),
+    // Questions Oui/Non posées avant la réécriture (exigés d'abord)
+    questionsOffre: preparerQuestions(
+      affichage([...critiquesManquants, ...cmpAutres.manquants]),
+      affichage([...cmpDurs.presents, ...cmpAutres.presents]),
+      texteOffre,
+    ).slice(0, 10),
     titrePoste,
     titreMatch: Math.round(titreMatch * 100),
     experienceRequise,
@@ -1688,7 +1696,8 @@ function validerCV(raw) {
   const debut = txt.indexOf("{");
   const fin = txt.lastIndexOf("}");
   if (debut !== -1 && fin !== -1) txt = txt.slice(debut, fin + 1);
-  const obj = JSON.parse(txt);
+  // Aucun tiret cadratin / demi-cadratin dans le texte généré (règle produit)
+  const obj = nettoyerTiretsCv(JSON.parse(txt));
 
   const str = (v, max) => (typeof v === "string" ? v.trim().substring(0, max) : "");
   const strArr = (v, maxItems, maxLen) =>
@@ -1700,6 +1709,7 @@ function validerCV(raw) {
     ? obj.experiences.slice(0, 5).map(e => ({
         poste:     str(e?.poste, 100),
         entreprise:str(e?.entreprise, 100),
+        lieu:      str(e?.lieu, 60),
         dates:     str(e?.dates, 60),
         taches:    strArr(e?.taches, 6, 240),
       })).filter(e => e.poste || e.entreprise)
@@ -1729,7 +1739,9 @@ function validerCV(raw) {
     profil: str(obj.profil, 600),
     experiences,
     formations,
-    competences: strArr(obj.competences, 10, 120),
+    // Compétences regroupées par thème : [{theme, elements}] -> "Thème : a, b"
+    competences: strArr(aplatirCompetences(obj.competences), 10, 220),
+    savoirEtre:  strArr(obj.savoirEtre, 5, 60),
     langues:     strArr(obj.langues, 8, 80),
     nouveauScore,
   };
@@ -1757,7 +1769,7 @@ function cvVersTexte(cv) {
   if (cv.experiences.length) {
     lignes.push("", "EXPÉRIENCES");
     cv.experiences.forEach(e => {
-      const entete = [e.poste, e.entreprise].filter(Boolean).join(", ");
+      const entete = [e.poste, e.entreprise, e.lieu].filter(Boolean).join(", ");
       lignes.push(entete + (e.dates ? `  (${e.dates})` : ""));
       e.taches.forEach(t => lignes.push("- " + t));
     });
@@ -1770,6 +1782,9 @@ function cvVersTexte(cv) {
     lignes.push("", "COMPÉTENCES");
     cv.competences.forEach(c => lignes.push("- " + c));
   }
+  if (cv.savoirEtre?.length) {
+    lignes.push("", "SAVOIR-ÊTRE", cv.savoirEtre.join(" · "));
+  }
   if (cv.langues.length) {
     lignes.push("", "LANGUES", cv.langues.join(" · "));
   }
@@ -1778,95 +1793,13 @@ function cvVersTexte(cv) {
 
 // Génère le HTML complet du CV à partir du CV structuré (aperçu ET téléchargement)
 function genererCvHtml(cv, secteur, opts = {}) {
-  const { avecPhoto = false, pourImpression = false, couleurCustom = null, sectionsMasquees = [] } = opts;
+  const { couleurCustom = null, ...reste } = opts;
   // Thème : couleur personnalisée choisie par l'utilisateur, sinon thème du secteur
   const base = THEMES[secteur] || THEMES.default;
   const t = couleurCustom
     ? { primary: couleurCustom.primary, accent: couleurCustom.accent, font: base.font }
     : base;
-  const masquee = (id) => sectionsMasquees.includes(id);
-
-  // Bloc photo (cadre vide), seulement si demandé
-  const photoBloc = avecPhoto ? `
-    <div class="photo-box"><div class="photo-inner">📷<br/>Ajoutez<br/>votre photo</div></div>` : "";
-
-  // Coordonnées de la sidebar, vraie valeur ou placeholder éditable
-  const ligneContact = (icone, valeur, placeholder) =>
-    `<p contenteditable="true" spellcheck="false">${icone} ${valeur ? esc(valeur) : placeholder}</p>`;
-
-  // Section EXPÉRIENCES, chaque type d'info a son style
-  const expHtml = cv.experiences.map(e => {
-    const taches = e.taches.length
-      ? `<ul>${e.taches.map(tx => `<li>${esc(tx)}</li>`).join("")}</ul>` : "";
-    const entreprise = e.entreprise ? `<span class="exp-company">, ${esc(e.entreprise)}</span>` : "";
-    const dates = e.dates ? `<div class="exp-dates">${esc(e.dates)}</div>` : "";
-    return `<div class="exp-item"><div class="exp-head"><span class="exp-role">${esc(e.poste)}</span>${entreprise}</div>${dates}${taches}</div>`;
-  }).join("");
-
-  // Section FORMATION
-  const formHtml = cv.formations.map(f =>
-    `<div class="form-item"><span class="form-years">${esc(f.annees)}</span><span class="form-label">${esc(f.intitule)}</span></div>`
-  ).join("");
-
-  // Compétences (liste à puces)
-  const compHtml = cv.competences.length
-    ? `<ul>${cv.competences.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : "";
-
-  // Langues (ligne simple)
-  const langHtml = cv.langues.length
-    ? `<p class="langues">${cv.langues.map(l => esc(l)).join("  ·  ")}</p>` : "";
-
-  const profilHtml = cv.profil ? `<p class="profil">${esc(cv.profil)}</p>` : "";
-
-  const hintBloc = pourImpression ? "" :
-    `<div class="hint">✏️ Cliquez sur une coordonnée pour la corriger</div>`;
-  const footerBloc = pourImpression ? "" :
-    `<div class="footer-note">💡 Corrigez vos coordonnées à gauche si besoin · Puis enregistrez au format PDF depuis la fenêtre d'impression</div>`;
-
-  const css = `@page{size:A4;margin:0}
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{width:210mm;font-family:${t.font};color:#222;background:#fff;font-size:9.5pt;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.page{width:210mm;min-height:297mm;max-height:297mm;overflow:hidden;display:flex;flex-direction:column}
-.top-bar{background:${t.primary};padding:16px 26px;border-bottom:4px solid ${t.accent};display:flex;align-items:center;justify-content:space-between;gap:18px}
-.id-block{min-width:0}
-.candidate-name{font-size:21pt;font-weight:700;color:#fff;letter-spacing:0.3px}
-.candidate-title{font-size:10.5pt;color:rgba(255,255,255,0.88);margin-top:3px;font-style:italic}
-.photo-box{width:26mm;height:26mm;border:2px dashed rgba(255,255,255,0.5);border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.photo-inner{color:rgba(255,255,255,0.7);font-size:6.5pt;text-align:center;line-height:1.3}
-.contact-bar{display:flex;flex-wrap:wrap;gap:4px 20px;padding:8px 26px;background:${t.accent}14;border-bottom:1px solid ${t.accent}55}
-.contact-bar p{font-size:8.6pt;color:#333}
-.main{flex:1;padding:15px 26px}
-.section-title{font-size:8.2pt;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:${t.accent};border-bottom:1.5px solid ${t.accent};padding-bottom:3px;margin:14px 0 7px}
-.section-title:first-child{margin-top:0}
-.profil{font-size:9pt;line-height:1.55;text-align:justify;margin-bottom:4px}
-.exp-item{margin-bottom:8px}
-.exp-head{font-size:9.4pt;line-height:1.3}
-.exp-role{font-weight:700;color:#1a1a1a}
-.exp-company{font-weight:600;color:${t.primary}}
-.exp-dates{font-size:7.8pt;color:#888;font-style:italic;margin:1px 0 3px}
-.main ul{padding-left:16px;margin:2px 0 5px}
-.main li{font-size:8.8pt;line-height:1.42;margin-bottom:2px}
-.form-item{margin-bottom:4px;font-size:8.9pt;display:flex;gap:8px}
-.form-years{font-weight:700;color:${t.accent};white-space:nowrap;min-width:62px}
-.form-label{color:#333}
-.langues{font-size:8.9pt}
-[contenteditable]{outline:none;border-bottom:1px dashed #c0c0c0;cursor:text}
-[contenteditable]:focus{background:${t.accent}1A}
-.hint{background:#fff3cd;color:#856404;font-size:6.5pt;padding:3px 8px;margin:8px 26px 0;border-radius:3px;border:1px solid #ffc107}
-.footer-note{font-size:6pt;color:#bbb;text-align:center;padding:5px;border-top:1px solid #eee}
-@media print{.hint,.footer-note{display:none}[contenteditable]{border-bottom:none}}`;
-
-  const mainSections = [
-    (profilHtml && !masquee("profil")) ? `<div class="section-title">Profil</div>${profilHtml}` : "",
-    (expHtml && !masquee("experiences")) ? `<div class="section-title">Expériences</div>${expHtml}` : "",
-    (formHtml && !masquee("formations")) ? `<div class="section-title">Formation</div>${formHtml}` : "",
-    (compHtml && !masquee("competences")) ? `<div class="section-title">Compétences</div>${compHtml}` : "",
-    (langHtml && !masquee("langues")) ? `<div class="section-title">Langues</div>${langHtml}` : "",
-  ].join("");
-
-  return `<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>CV ${esc(cv.nom)}</title>
-<style>${css}</style></head>
-<body><div class="page"><div class="top-bar"><div class="id-block"><div class="candidate-name">${esc(cv.nom)}</div><div class="candidate-title">${esc(cv.titre)}</div></div>${photoBloc}</div>${hintBloc}<div class="contact-bar">${ligneContact("📧", cv.contact.email, "votre@email.com")}${ligneContact("📞", cv.contact.telephone, "06 XX XX XX XX")}${ligneContact("📍", cv.contact.ville, "Votre ville")}${ligneContact("🔗", cv.contact.linkedin, "linkedin.com/in/profil")}</div><div class="main">${mainSections}</div>${footerBloc}</div></body></html>`;
+  return genererCvHtmlFr(cv, t, reste);
 }
 
 // ── Template FORMAT AMÉRICAIN / INTERNATIONAL ──────────────────────
@@ -1914,7 +1847,8 @@ function genererCvHtmlUS(cv, opts = {}) {
     const dates  = typeof e?.dates      === "string" ? e.dates      : "";
     const entr   = typeof e?.entreprise === "string" ? e.entreprise : "";
     const head = `<div class="us-exp-head"><span class="us-role">${esc(poste)}</span><span class="us-dates">${esc(dates)}</span></div>`;
-    const comp = entr ? `<div class="us-company">${esc(entr)}</div>` : "";
+    const lieu   = typeof e?.lieu       === "string" ? e.lieu       : "";
+    const comp = (entr || lieu) ? `<div class="us-company">${[entr, lieu].filter(Boolean).map(esc).join(", ")}</div>` : "";
     return `<div class="us-item">${head}${comp}${taches}</div>`;
   }).join("");
 
@@ -3388,6 +3322,38 @@ function Tags({ items, color, bg }) {
   );
 }
 
+// Éléments demandés par l'offre et absents du CV : on demande au candidat
+// AVANT la réécriture. Seuls les « Oui » sont transmis au modèle ;
+// sans réponse, rien n'est ajouté.
+function QuestionsOffre({ mots, reponses, onRepondre }) {
+  const T = useT();
+  const bouton = (actif, couleur) => ({
+    minHeight: "44px", minWidth: "76px", padding: "8px 16px", borderRadius: "10px",
+    fontSize: "15px", fontWeight: 700, fontFamily: FONT_SANS, cursor: "pointer",
+    border: `2px solid ${actif ? couleur : C.borderStrong}`,
+    background: actif ? couleur : C.bgSubtle, color: actif ? "#fff" : C.text,
+  });
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      {mots.map(m => (
+        <div key={m} style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px",
+          padding: "12px 16px", border: `1px solid ${C.border}`, borderRadius: "12px", background: C.bgSubtle,
+        }}>
+          <span style={{ fontSize: "15px", color: C.text, fontFamily: FONT_SANS, lineHeight: 1.5, flex: "1 1 240px" }}>
+            {T(<>L'offre demande <strong>« {m} »</strong>. Vous l'avez déjà pratiqué ?</>,
+               <>The job asks for <strong>“{m}”</strong>. Have you done it before?</>)}
+          </span>
+          <span style={{ display: "flex", gap: "8px" }}>
+            <button type="button" aria-pressed={reponses[m] === "oui"} style={bouton(reponses[m] === "oui", C.success)} onClick={() => onRepondre(m, "oui")}>{T("Oui", "Yes")}</button>
+            <button type="button" aria-pressed={reponses[m] === "non"} style={bouton(reponses[m] === "non", C.textSecondary)} onClick={() => onRepondre(m, "non")}>{T("Non", "No")}</button>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function CopyBtn({ text }) {
   const T = useT();
   const [copied, setCopied] = useState(false);
@@ -3973,6 +3939,8 @@ function EditeurTexteCV({ cv, onChange }) {
           <input style={champStyle} value={e.poste} onChange={ev => setExp(idx, "poste", ev.target.value)}/>
           <label style={labelStyle}>{T("Entreprise", "Company")}</label>
           <input style={champStyle} value={e.entreprise} onChange={ev => setExp(idx, "entreprise", ev.target.value)}/>
+          <label style={labelStyle}>{T("Lieu", "Location")}</label>
+          <input style={champStyle} value={e.lieu || ""} onChange={ev => setExp(idx, "lieu", ev.target.value)}/>
           <label style={labelStyle}>{T("Dates", "Dates")}</label>
           <input style={champStyle} value={e.dates} onChange={ev => setExp(idx, "dates", ev.target.value)}/>
           {e.taches.map((t, j) => (
@@ -4603,6 +4571,8 @@ export default function App() {
   const [loadingMsg, setLoadingMsg]         = useState("");
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [analyse, setAnalyse]               = useState(null);
+  // Réponses Oui/Non du candidat sur les éléments de l'offre absents du CV
+  const [reponsesOffre, setReponsesOffre]   = useState({});
   const [cvOpt, setCvOpt]                   = useState(null);
   const [cvOptError, setCvOptError]         = useState("");
   const [scoreOptimise, setScoreOptimise]   = useState(null);
@@ -4794,7 +4764,7 @@ export default function App() {
   const doAnalyse = async () => {
     if (loading || !canAnalyze) return;
     // Analyse gratuite illimitée, plus de vérification de crédit
-    setLoading(true); setLoadingMsg(T("Analyse de votre CV en cours", "Analyzing your résumé")); setStep(3); setAnalyse(null);
+    setLoading(true); setLoadingMsg(T("Analyse de votre CV en cours", "Analyzing your résumé")); setStep(3); setAnalyse(null); setReponsesOffre({});
     const stopProgress = startProgress();
     try {
       let cvContent = "";
@@ -4818,6 +4788,11 @@ export default function App() {
     stopProgress();
     setLoading(false);
   };
+
+  // Éléments de l'offre absents du CV, formulés en questions (exigés d'abord)
+  const elementsAbsents = analyse?.questionsOffre
+    || [...new Set([...(analyse?.motsManquantsCritiques || []), ...(analyse?.motsManquants || [])])];
+  const nbConfirmes = elementsAbsents.filter(m => reponsesOffre[m] === "oui").length;
 
   const doCvOpt = async () => {
     if (loading || !canCvOpt) return;
@@ -4846,19 +4821,14 @@ export default function App() {
       if (offrePdfInfo?.texte && !offrePdfInfo.estPhoto) offreContent = limiterTexte(offrePdfInfo.texte, LIMITS.OFFRE_MAX).texte;
       else if (offreText) offreContent = limiterTexte(offreText, LIMITS.OFFRE_MAX).texte;
 
-      const userText = [
-        envelopper("CV_ORIGINAL", cvContent),
-        envelopper("FICHE_POSTE", offreContent),
-        envelopper("MOTS_CLES", analyse?.motsManquants?.join(", ") || ""),
-      ].filter(Boolean).join("\n\n");
-
       // Le CV est généré en JSON structuré : on attend la réponse complète avant de parser.
       // SÉCURITÉ : le serveur vérifie le compte, débite le crédit ATOMIQUEMENT
       // AVANT l'appel IA (et rembourse si l'IA échoue). Plus aucun débit côté client.
       const { text: raw, credits: soldeServeur } = await callClaude("rewrite", {
         cv: cvContent,
         offre: offreContent,
-        motsCles: analyse?.motsManquants?.join(", ") || "",
+        // Seuls les éléments confirmés « Oui » par le candidat peuvent être ajoutés
+        motsConfirmes: elementsAbsents.filter(m => reponsesOffre[m] === "oui").join(", "),
       });
       if (!raw?.trim()) throw new Error(T("Réponse vide. Réessayez s'il vous plaît.", "Empty response. Please try again."));
       let cv;
@@ -5322,12 +5292,20 @@ export default function App() {
               </div>
             )}
 
-            {analyse.motsManquants.length > 0 && (
+            {elementsAbsents.length > 0 && (
               <div style={{ marginBottom: "24px" }}>
-                <div style={{ fontSize: "15px", fontWeight: 700, color: C.error, marginBottom: "10px", fontFamily: FONT_SANS, display: "flex", alignItems: "center", gap: "8px" }}>
-                  {T("❌ Mots-clés manquants : nous les ajouterons", "❌ Missing keywords, we'll add them")} ({analyse.motsManquants.length})
+                <div style={{ fontSize: "15px", fontWeight: 700, color: C.text, marginBottom: "6px", fontFamily: FONT_SANS }}>
+                  {T("Avant la réécriture : ces éléments de l'offre n'apparaissent pas dans votre CV", "Before the rewrite: these items from the job don't appear in your résumé")} ({elementsAbsents.length})
                 </div>
-                <Tags items={analyse.motsManquants} color={C.error} bg={C.errorSoft}/>
+                <p style={{ fontSize: "14px", color: C.textSecondary, margin: "0 0 12px", fontFamily: FONT_SANS, lineHeight: 1.55 }}>
+                  {T("Nous n'ajoutons que ce que vous avez réellement pratiqué. Répondez Oui ou Non : sans réponse, rien n'est ajouté.",
+                     "We only add what you have actually done. Answer Yes or No: without an answer, nothing is added.")}
+                </p>
+                <QuestionsOffre
+                  mots={elementsAbsents}
+                  reponses={reponsesOffre}
+                  onRepondre={(m, v) => setReponsesOffre(r => ({ ...r, [m]: v }))}
+                />
               </div>
             )}
 
@@ -5669,7 +5647,9 @@ export default function App() {
                 </div>
                 <div style={{ fontSize: "16px", color: C.text, lineHeight: 2 }}>
                   {T("✓ Score de compatibilité : ", "✓ Compatibility score: ")}<strong style={{ color: C.success }}>{scoreOptimise ?? analyse?.score}%</strong><br/>
-                  {T(`✓ CV optimisé sur 1 page avec ${analyse?.motsManquants?.length ?? 0} mots-clés ajoutés`, `✓ One-page optimized résumé with ${analyse?.motsManquants?.length ?? 0} keywords added`)}<br/>
+                  {nbConfirmes > 0
+                    ? T(`✓ CV optimisé sur 1 page, avec les ${nbConfirmes} éléments de l'offre que vous avez confirmés`, `✓ One-page optimized résumé, including the ${nbConfirmes} job items you confirmed`)
+                    : T("✓ CV optimisé sur 1 page, fidèle à votre parcours", "✓ One-page optimized résumé, true to your career")}<br/>
                   {T("✓ Lettre de motivation personnalisée", "✓ Personalized cover letter")}
                 </div>
                 <ConseilATS variant="etape5"/>

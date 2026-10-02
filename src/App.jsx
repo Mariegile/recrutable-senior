@@ -900,7 +900,9 @@ function extraireMotsCles(texteOffre, secteur) {
   const triés = Object.entries(freq)
     .sort((a, b) => b[1] - a[1])
     .map(([mot]) => mot)
-    .filter(m => m.length >= 4 && !/^\d+$/.test(m) && !motsDejaCouverts.has(m) && !MOTS_MARQUEURS.has(m));
+    .filter(m => m.length >= 4 && !/^\d+$/.test(m) && !motsDejaCouverts.has(m) && !MOTS_MARQUEURS.has(m)
+      && !MOTS_GENERIQUES_OFFRE.has(m)
+      && !/ez$/.test(m));                  // verbes « vous possédez / détenez / maîtrisez »
   return [...ngramsTrouves, ...triés].slice(0, 15);
 }
 
@@ -1511,6 +1513,13 @@ function analyserDiplome(texteOffre, texteCV) {
 // ultérieurement par la recherche "grammaire des offres"). Désaccentués.
 const MARQUEURS_EXIGENCE_DURE = ["imperatif", "imperative", "exige", "exigee", "exigees", "indispensable", "indispensables", "requis", "requise", "requises", "obligatoire", "obligatoires", "vous devez", "maitrise parfaite de", "maitrise imperative", "experience exigee", "necessaire", "necessaires", "vous justifiez obligatoirement", "il est indispensable de", "maitrise absolue", "imperativement", "obligatoirement", "condition sine qua non", "vous maitrisez parfaitement", "vous devez imperativement", "minimum", "maitrise de", "must have", "must-have", "required", "mandatory", "essential", "proven", "you must", "is required", "fluent in", "must demonstrate", "is essential", "are required", "proven experience", "you will need", "mandatory requirement", "must possess", "minimum of", "is mandatory", "solid understanding of", "perfect mastery of", "strong experience in", "must be able to", "demonstrated ability", "has to be", "at least", "needs to", "necessary"];
 const MARQUEURS_EXIGENCE_SOUHAITEE = ["serait un plus", "idealement", "apprecie", "appreciee", "apprecies", "souhaite", "souhaitee", "souhaitees", "un atout", "notions de", "fortement apprecie", "serait grandement apprecie", "constitue un plus", "un veritable atout", "des notions de", "serait appreciee", "idealement diplome", "est un plus", "fortement souhaite", "serait un veritable avantage", "de preference", "optionnel", "bonus", "nice to have", "nice-to-have", "a plus", "preferred", "ideally", "familiarity with", "would be an asset", "strongly preferred", "is desired", "plus but not required", "is a plus", "experience is preferred", "highly appreciated", "not required but a plus", "is an advantage", "would be beneficial", "familiarity is a plus", "desirable", "would be"];
+// Mots d'annonce sans valeur de compétence (désaccentués), dont les fragments
+// d'écriture inclusive (« fédérateur.trice » -> « trice »).
+const MOTS_GENERIQUES_OFFRE = new Set(["etre", "etes", "avez", "esprit", "savoir", "trice", "rice", "euse", "ices",
+  "convaincant", "convaincante", "federateur", "federatrice", "dynamique", "motive", "motivee", "rigoureux",
+  "rigoureuse", "autonome", "polyvalent", "polyvalente", "solides", "bonnes", "bonne", "principales", "collaboration",
+  "satisfaction", "garantir", "assurer", "respecter", "suivre", "elaborer", "vous", "nous", "notre", "votre",
+  "egalement", "privilegie", "privilegiee", "service", "principales", "quotidien", "temps", "complet", "complete"]);
 // Mots de marquage : jamais des mots-clés en eux-mêmes (exclus de l'extraction)
 const MOTS_MARQUEURS = new Set(["exige", "exigee", "exigees", "exigence", "exigences", "requis", "requise", "requises", "required", "obligatoire", "obligatoires", "mandatory", "imperatif", "imperative", "imperativement", "obligatoirement", "indispensable", "indispensables", "essential", "necessaire", "necessaires", "necessary", "minimum", "maitrise", "maitrisez", "proven", "preferred", "ideally", "idealement", "apprecie", "appreciee", "apprecies", "souhaite", "souhaitee", "souhaitees", "atout", "atouts", "notions", "bonus", "desirable", "familiarity", "optionnel", "preference", "profil", "recherche", "recherchons", "justifiez", "titulaire", "condition", "demonstrated", "possess", "diplome", "diplomes", "entreprise", "entreprises", "pourvoir", "immediatement", "plein", "partiel", "societe", "ecole", "ecoles", "experience", "experiences", "serait", "mission", "missions", "poste", "postes", "annee", "annees", "formation", "formations", "niveau", "connaissance", "connaissances", "justifier", "candidat", "candidate", "idealement"]);
 

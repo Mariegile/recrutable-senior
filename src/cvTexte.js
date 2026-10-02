@@ -49,8 +49,12 @@ export function restaurerAccents(motNorm, texteSource, { casse = false } = {}) {
 // Les mots présents uniquement dans la 1re ligne (intitulé, employeur) sont
 // écartés : le titre est traité à part et l'employeur n'est pas une compétence.
 export function preparerQuestions(manquants, presents, texteOffre) {
-  const lignes = String(texteOffre || "").split(/\n/).filter(l => l.trim());
-  const corps = lignes.slice(1);
+  // En-tête = intitulé + lignes de contrat/établissement jusqu'au 1er saut de
+  // ligne (s'il arrive tôt) ; les questions ne portent que sur le corps.
+  const brutes = String(texteOffre || "").split(/\n/);
+  const vide = brutes.findIndex((l, i) => i > 0 && !l.trim());
+  const debut = vide > 0 && vide <= 3 ? vide : 1;
+  const corps = brutes.slice(debut).filter(l => l.trim());
   const motsParLigne = corps.map(l => (l.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || [])
     .map(m => m.replace(/^[ldLD]['’]/, "")));
   const absents = new Set(manquants.flatMap(k => sansAccents(k).split(/\s+/)));

@@ -1470,6 +1470,7 @@ function extraireExperienceRequise(texteOffre) {
 // mode "min" pour l'offre (« Bac+2 minimum (BTS, DCG) » : le Bac+2 suffit),
 // "max" pour le CV (le plus haut diplôme du candidat).
 function scanNiveauDiplome(texteNorm, mode = "max") {
+  texteNorm = texteNorm.replace(/\bbac\s*\+\s*(\d)/g, "bac+$1"); // « Bac +2 » -> « bac+2 »
   let niveau = null, libelle = null;
   for (const d of DIPLOMES_EQF) {
     for (const mot of d.mots) {
@@ -1478,7 +1479,7 @@ function scanNiveauDiplome(texteNorm, mode = "max") {
       // « maîtrise ERP », « maîtrise d'Excel » = savoir-faire.
       const rx = mot === "maitrise"
         ? /(?:titulaire d'une|diplome d'une|niveau|une|bac\+4,?)\s+maitrise\b|\bmaitrise\s+(?:en|\(bac)/
-        : new RegExp(`(^|[^a-z0-9+])${mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`);
+        : new RegExp(`(^|[^a-z0-9+])${mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9+]|$)`); // « bac » ne matche pas « bac+2 »
       if (rx.test(texteNorm)) {
         if (niveau === null || (mode === "min" ? d.niveau < niveau : d.niveau > niveau)) { niveau = d.niveau; libelle = mot; }
         break;

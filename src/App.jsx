@@ -4724,7 +4724,15 @@ export default function App() {
     if (!session) return;
     try {
       // On restaure tous les états sauvegardés (avec valeurs par défaut sûres)
-      if (typeof session.step === "number")     setStep(session.step);
+      // Étape cohérente avec les données : sans CV réécrit (ex. réécriture
+      // interrompue ou en erreur), on revient à l'analyse au lieu d'une
+      // étape 4 vide sans bouton de retour.
+      if (typeof session.step === "number") {
+        let s = session.step;
+        if (s >= 4 && !session.cvOpt) s = session.analyse && !session.analyse.error ? 3 : 1;
+        if (s === 3 && !session.analyse) s = 1;
+        setStep(s);
+      }
       if (typeof session.cvText === "string")   setCvText(session.cvText);
       if (session.cvPdfInfo)                    setCvPdfInfo(session.cvPdfInfo);
       if (typeof session.offreText === "string") setOffreText(session.offreText);

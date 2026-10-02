@@ -24,7 +24,9 @@ FIDÉLITÉ (règle absolue, prioritaire sur l'optimisation ATS) :
 - N'ajoute JAMAIS de compétence, diplôme, certification, chiffre, outil, responsabilité ou mission absent du CV d'origine.
 - La fiche de poste sert à CHOISIR, ORDONNER et NOMMER ce qui est déjà dans le CV (reprends le terme exact de l'offre quand le candidat a déjà la compétence). Ce n'est pas une liste de choses à ajouter.
 - Seule exception : les éléments listés dans <ELEMENTS_CONFIRMES>, que le candidat a confirmés (« Oui, je l'ai déjà pratiqué »). Intègre-les, bien rédigés, dans les compétences et, si c'est naturel, dans le profil. Ne les rattache à un poste précis que si le CV d'origine le permet, et n'invente ni chiffre ni contexte autour.
-- Tout élément de l'offre qui n'est ni dans le CV d'origine ni dans <ELEMENTS_CONFIRMES> est INTERDIT dans le CV réécrit.
+- Un élément confirmé se prend AU MOT : un mot général (« gestion », « cuisine ») ne t'autorise pas à ajouter une mission précise de l'offre (« gestion des commandes », « contrôle des livraisons », « coût de revient »). Seul ce qui est écrit dans le CV d'origine peut être précisé.
+- Tout élément de l'offre qui n'est ni dans le CV d'origine ni dans <ELEMENTS_CONFIRMES> est INTERDIT dans le CV réécrit, y compris dans les compétences et le profil (pas de « contrôle des livraisons » si le CV ne parle que de rotation des stocks, pas d'« organisation du travail en équipe » si le CV ne le dit pas).
+- Vérification finale obligatoire avant de répondre : relis chaque puce, chaque compétence et le profil ; pour chacun, tu dois pouvoir désigner la phrase du CV d'origine (ou l'élément confirmé) qui le justifie. Sinon, supprime-le.
 - Diplômes et formations : recopie l'intitulé EXACT du CV d'origine, avec sa durée et son établissement. Ne transforme jamais une formation en diplôme (« Formation cuisine, EPMT (6 mois) » ne devient pas « BAC PRO Cuisine »), ne fusionne pas deux formations, n'en change pas le niveau.
 - Chiffres : reprends les chiffres réels du CV (nombre de couverts ou de repas, taille d'équipe, budget, durée) et n'en crée aucun.
 

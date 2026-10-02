@@ -2182,20 +2182,38 @@ const GLOBAL_STYLES = `
       height: 24px !important;
     }
     .app-header-tagline {
-      font-size: 13px !important;
+      font-size: 12.5px !important;
       margin-top: 2px !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
     }
+    /* En-tête en 2 rangées : logo + slogan sur une ligne, puis les actions
+       (FR/EN, compte, crédits) sur toute la largeur. E-mail masqué
+       (visible en info-bulle du bouton Déconnexion). */
+    .app-header-inner {
+      flex-wrap: wrap !important;
+      gap: 10px 12px !important;
+    }
+    .app-header-brand { flex: 1 1 100% !important; min-width: 0 !important; }
+    .app-header-actions {
+      flex: 1 1 100% !important;
+      flex-wrap: nowrap !important;
+      justify-content: space-between !important;
+      gap: 8px !important;
+      min-width: 0 !important;
+    }
+    .app-header-email { display: none !important; }
+    .app-header-logout { padding: 8px 10px !important; white-space: nowrap !important; }
 
-    /* 6. CREDIT BADGE plus petit */
-    .credit-badge {
-      padding: 8px 12px !important;
-    }
-    .credit-badge-label {
-      font-size: 11px !important;
-    }
-    .credit-badge-value {
-      font-size: 18px !important;
-    }
+    /* 6. CREDIT BADGE compact : icône + nombre (libellé en aria-label) */
+    .credit-badge { padding: 6px 10px !important; gap: 6px !important; flex-shrink: 0 !important; }
+    .credit-badge-label, .credit-badge-recharge { display: none !important; }
+    .credit-badge-value { font-size: 18px !important; }
+
+    /* Bannière de retour de paiement : marges et icône réduites */
+    .payment-banner { top: 12px !important; left: 10px !important; right: 10px !important; padding: 14px 12px 14px 14px !important; gap: 10px !important; }
+    .payment-banner-emoji { font-size: 28px !important; }
 
     /* 7. Conteneur principal : padding réduit */
     .app-main-container {
@@ -2326,26 +2344,28 @@ function PaymentSuccessBanner({ formule, etat, credits, onClose }) {
   if (!config) return null;
 
   return (
-    <div style={{
-      position: "fixed", top: "20px", left: "50%",
-      transform: "translateX(-50%)",
+    // Centrage sans transform : l'animation fadeIn anime transform et
+    // écraserait un translateX(-50%) (bannière décalée hors écran).
+    <div className="payment-banner" style={{
+      position: "fixed", top: "20px", left: "16px", right: "16px",
+      margin: "0 auto",
       zIndex: 10000,
-      maxWidth: "520px", width: "calc(100% - 32px)",
+      maxWidth: "520px", boxSizing: "border-box",
       background: C.bgCard,
       border: `2px solid ${C.success}`,
       borderRadius: "14px",
       boxShadow: "0 12px 40px rgba(30,107,71,0.25)",
       padding: "18px 22px",
       display: "flex", alignItems: "flex-start", gap: "14px",
-      fontFamily: FONT_SANS,
+      fontFamily: FONT_SANS, textAlign: "left",
       animation: "fadeIn 0.4s ease",
     }}>
-      <div style={{ fontSize: "36px", lineHeight: 1, flexShrink: 0 }}>
+      <div className="payment-banner-emoji" style={{ fontSize: "36px", lineHeight: 1, flexShrink: 0 }}>
         {config.emoji}
       </div>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
         <div style={{ fontSize: "17px", fontWeight: 700, color: C.success, fontFamily: FONT_SERIF, marginBottom: "4px" }}>
-          {T("Paiement reçu, merci !", "Payment received, thank you!")}
+          {T("Paiement reçu, merci !", "Payment received, thank you!")}
         </div>
         <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.5 }}>
           {T("Votre achat « ", "Your purchase “")}<strong>{config.label}</strong>{T(" » est enregistré.", "” is recorded.")}
@@ -2646,7 +2666,7 @@ function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
         maxWidth: "780px", margin: "0 auto",
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px",
       }}>
-        <div>
+        <div className="app-header-brand">
           {/* Logo (wordmark). Le H1 de la page porte la promesse, dans le hero. */}
           <img
             src="/logo-recrutable.svg" alt="Recrutable"
@@ -2671,7 +2691,7 @@ function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
             {T("Un CV taillé pour chaque offre que vous visez", "A résumé tailored to every job you target")}
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div className="app-header-actions" style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
           {/* Onglet de langue FR / EN */}
           <div style={{ display: "inline-flex", background: C.bgSubtle, border: `1px solid ${C.border}`, borderRadius: "9px", padding: "2px" }}>
             {langBtn("fr", "FR")}
@@ -2679,8 +2699,8 @@ function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
           </div>
           {session ? (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: FONT_SANS, maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.user?.email}</span>
-              <button onClick={onLogout} style={{ padding: "8px 12px", background: C.bgSubtle, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "13px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>{T("Déconnexion", "Log out")}</button>
+              <span className="app-header-email" style={{ fontSize: "13px", color: C.textMuted, fontFamily: FONT_SANS, maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.user?.email}</span>
+              <button onClick={onLogout} className="app-header-logout" title={session.user?.email || ""} style={{ padding: "8px 12px", background: C.bgSubtle, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "13px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>{T("Déconnexion", "Log out")}</button>
             </div>
           ) : (
             <button onClick={onLogin} style={{ padding: "9px 16px", background: C.primary, color: "#FFF", border: "none", borderRadius: "9px", fontSize: "14px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>{T("Se connecter", "Log in")}</button>
@@ -2703,6 +2723,8 @@ function CreditBadge({ credits, onClick }) {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       title={T("Cliquez pour voir les abonnements et recharges", "Click to see subscriptions and top-ups")}
+      aria-label={T(`Diagnostics restants : ${credits}. Recharger`, `Diagnostics left: ${credits}. Top up`)}
+      className="credit-badge"
       style={{
         background: bg,
         border: `2px solid ${hover ? color : `${color}40`}`,
@@ -2717,12 +2739,12 @@ function CreditBadge({ credits, onClick }) {
     >
       <span style={{ fontSize: "18px" }}>🎟️</span>
       <div style={{ textAlign: "left" }}>
-        <div style={{ fontSize: "12px", color: C.textMuted, fontFamily: FONT_SANS, fontWeight: 500, lineHeight: 1 }}>
+        <div className="credit-badge-label" style={{ fontSize: "12px", color: C.textMuted, fontFamily: FONT_SANS, fontWeight: 500, lineHeight: 1 }}>
           {T("Diagnostics restants", "Diagnostics left")}
         </div>
-        <div style={{ fontSize: "20px", color, fontFamily: FONT_SERIF, fontWeight: 700, lineHeight: 1.2, display: "flex", alignItems: "baseline", gap: "6px" }}>
+        <div className="credit-badge-value" style={{ fontSize: "20px", color, fontFamily: FONT_SERIF, fontWeight: 700, lineHeight: 1.2, display: "flex", alignItems: "baseline", gap: "6px" }}>
           {credits}
-          <span style={{ fontSize: "11px", color: C.textMuted, fontWeight: 600, opacity: hover ? 1 : 0.7 }}>
+          <span className="credit-badge-recharge" style={{ fontSize: "11px", color: C.textMuted, fontWeight: 600, opacity: hover ? 1 : 0.7 }}>
             {T("(recharger)", "(top up)")}
           </span>
         </div>
@@ -2832,7 +2854,7 @@ function StepBar({ current }) {
           marginBottom: "10px", fontFamily: FONT_SANS,
         }}>
           <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-            Étape {current} sur {steps.length}
+            {T("Étape", "Step")} {current} {T("sur", "of")} {steps.length}
           </div>
           <div style={{ fontSize: "14px", color: C.primary, fontWeight: 700 }}>
             {steps[current - 1]?.label}
@@ -4382,29 +4404,29 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
     {
       key: "annuel",
       label: T("Abonnement annuel", "Annual subscription"),
-      prix: "49,99 €", sous: T("soit 4,16 € / mois", "that's €4.16 / month"),
+      prix: "49,99 €", sous: T("soit 4,16 € / mois", "that's €4.16 / month"),
       items: [T("60 dossiers complets dans l'année", "60 complete sets per year"), T("Économisez 30 % vs mensuel", "Save 30% vs monthly"), T("Accès complet 12 mois", "Full access for 12 months")],
       href: stripeUrl(STRIPE_ANNUEL),
-      cta: T("Choisir l'annuel, 49,99 €", "Choose annual, €49.99"),
+      cta: T("Choisir l'annuel, 49,99 €", "Choose annual, €49.99"),
       badge: T("★ Meilleure offre", "★ Best value"),
       color: C.accent,
     },
     {
       key: "mensuel",
       label: T("Abonnement mensuel", "Monthly subscription"),
-      prix: "5,99 €", sous: T("par mois, sans engagement", "per month, no commitment"),
+      prix: "5,99 €", sous: T("par mois, sans engagement", "per month, no commitment"),
       items: [T("8 dossiers complets par mois", "8 complete sets per month"), T("Résiliable à tout moment", "Cancel anytime"), T("Idéal pour candidater régulièrement", "Great for applying regularly")],
       href: stripeUrl(STRIPE_MENSUEL),
-      cta: T("S'abonner, 5,99 € / mois", "Subscribe, €5.99 / month"),
+      cta: T("S'abonner, 5,99 € / mois", "Subscribe, €5.99 / month"),
       color: C.primary,
     },
     {
       key: "recharge",
       label: T("Recharge rapide", "Quick top-up"),
-      prix: "2,99 €", sous: T("paiement unique", "one-time payment"),
+      prix: "2,99 €", sous: T("paiement unique", "one-time payment"),
       items: [T("3 dossiers complets", "3 complete sets"), T("Sans abonnement", "No subscription"), T("Utilisable immédiatement", "Usable immediately")],
       href: stripeUrl(STRIPE_RECHARGE),
-      cta: T("Prendre la recharge, 2,99 €", "Get the top-up, €2.99"),
+      cta: T("Prendre la recharge, 2,99 €", "Get the top-up, €2.99"),
       color: C.success,
     },
   ];
@@ -4509,7 +4531,7 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
                   {o.label}
                 </div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                  <span style={{ fontSize: "22px", fontWeight: 700, color: o.color, fontFamily: FONT_SERIF, lineHeight: 1 }}>
+                  <span style={{ fontSize: "22px", fontWeight: 700, color: o.color, fontFamily: FONT_SERIF, lineHeight: 1, whiteSpace: "nowrap", flexShrink: 0 }}>
                     {o.prix}
                   </span>
                   <span style={{ fontSize: "12px", color: C.textSecondary, fontWeight: 500 }}>
@@ -4891,7 +4913,7 @@ export default function App() {
       return;
     }
     if (credits < CREDITS.REWRITE) {
-      setCvOptError(T(`Il vous faut 1 diagnostic pour la réécriture. Achetez la recharge à 2,99 € (3 dossiers complets).`, `You need 1 diagnostic to rewrite. Buy the top-up at €2.99 (3 complete sets).`));
+      setCvOptError(T("Il vous faut 1 diagnostic pour la réécriture. Achetez la recharge à 2,99 € (3 dossiers complets).", "You need 1 diagnostic to rewrite. Buy the top-up at €2.99 (3 complete sets)."));
       return;
     }
     setLoading(true); setLoadingMsg(T("Réécriture de votre CV", "Rewriting your résumé")); setStep(4);
@@ -4997,7 +5019,7 @@ export default function App() {
   const doLettre = async () => {
     if (loading) return;
     if (credits < CREDITS.LETTRE) {
-      setLettreError(T(`Il vous faut 1 diagnostic pour la lettre. Achetez la recharge à 2,99 €.`, `You need 1 diagnostic for the letter. Buy the top-up at €2.99.`));
+      setLettreError(T("Il vous faut 1 diagnostic pour la lettre. Achetez la recharge à 2,99 €.", "You need 1 diagnostic for the letter. Buy the top-up at €2.99."));
       return;
     }
     setLoading(true); setLoadingMsg(T("Rédaction de votre lettre de motivation", "Writing your cover letter")); setStep(5);
@@ -5571,7 +5593,7 @@ export default function App() {
             <div style={{ display: "flex", gap: "12px", marginTop: "4px", flexWrap: "wrap" }}>
               {paid
                 ? <CopyBtn text={cvVersTexte(cvAffiche)}/>
-                : <LockedBtn label={T("Débloquer la copie dès 2,99 €", "Unlock copying from €2.99")} onUnlock={() => setShowOffres(true)}/>
+                : <LockedBtn label={T("Débloquer la copie dès 2,99 €", "Unlock copying from €2.99")} onUnlock={() => setShowOffres(true)}/>
               }
             </div>
 
@@ -5592,7 +5614,7 @@ export default function App() {
                 </PrimaryBtn>
               ) : (
                 <LockedBtn
-                  label={T("Débloquer le téléchargement dès 2,99 €", "Unlock download from €2.99")}
+                  label={T("Débloquer le téléchargement dès 2,99 €", "Unlock download from €2.99")}
                   onUnlock={() => setShowOffres(true)}
                   fullWidth big
                 />
@@ -5606,7 +5628,7 @@ export default function App() {
             )}
             {!paid && (
               <p style={{ fontSize: "14px", color: C.textSecondary, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
-                {T(<>Votre CV est prêt. Pour le récupérer en PDF ou le copier, une <strong style={{ color: C.accent }}>recharge à 2,99 €</strong> suffit.</>, <>Your résumé is ready. To download it as a PDF or copy it, a <strong style={{ color: C.accent }}>€2.99 top-up</strong> is all you need.</>)}
+                {T(<>Votre CV est prêt. Pour le récupérer en PDF ou le copier, une <strong style={{ color: C.accent }}>recharge à 2,99&nbsp;€</strong> suffit.</>, <>Your résumé is ready. To download it as a PDF or copy it, a <strong style={{ color: C.accent }}>€2.99 top-up</strong> is all you need.</>)}
               </p>
             )}
 
@@ -5696,7 +5718,7 @@ export default function App() {
               <div style={{ display: "flex", gap: "12px", marginTop: "16px", flexWrap: "wrap" }}>
                 {paid
                   ? <CopyBtn text={lettre}/>
-                  : <LockedBtn label={T("Débloquer la copie dès 2,99 €", "Unlock copying from €2.99")} onUnlock={() => setShowOffres(true)}/>
+                  : <LockedBtn label={T("Débloquer la copie dès 2,99 €", "Unlock copying from €2.99")} onUnlock={() => setShowOffres(true)}/>
                 }
               </div>
 
@@ -5707,7 +5729,7 @@ export default function App() {
                   </PrimaryBtn>
                 ) : (
                   <LockedBtn
-                    label={T("Débloquer le téléchargement dès 2,99 €", "Unlock download from €2.99")}
+                    label={T("Débloquer le téléchargement dès 2,99 €", "Unlock download from €2.99")}
                     onUnlock={() => setShowOffres(true)}
                     fullWidth big
                   />
@@ -5721,7 +5743,7 @@ export default function App() {
               )}
               {!paid && (
                 <p style={{ fontSize: "14px", color: C.textSecondary, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
-                  {T(<>Votre lettre est prête. Pour la récupérer en PDF ou la copier, <strong style={{ color: C.accent }}>2,99 €</strong> suffit.</>, <>Your letter is ready. To download it as a PDF or copy it, <strong style={{ color: C.accent }}>€2.99</strong> is all you need.</>)}
+                  {T(<>Votre lettre est prête. Pour la récupérer en PDF ou la copier, <strong style={{ color: C.accent }}>2,99&nbsp;€</strong> suffit.</>, <>Your letter is ready. To download it as a PDF or copy it, <strong style={{ color: C.accent }}>€2.99</strong> is all you need.</>)}
                 </p>
               )}
 
@@ -5795,7 +5817,7 @@ export default function App() {
                   <div style={{ position: "absolute", top: "-10px", right: "16px", background: C.success, color: "#FFF", fontSize: "11px", padding: "3px 10px", borderRadius: "10px", fontWeight: 700 }}>
                     {T("★ Meilleure offre", "★ Best value")}
                   </div>
-                  {T("Annuel, 49,99 € (60 dossiers complets)", "Annual, €49.99 (60 complete sets)")}
+                  {T("Annuel, 49,99 € (60 dossiers complets)", "Annual, €49.99 (60 complete sets)")}
                 </div>
               </a>
               <a href={stripeUrl(STRIPE_MENSUEL)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
@@ -5806,7 +5828,7 @@ export default function App() {
                   fontSize: "15px", fontWeight: 600,
                   borderRadius: "12px",
                 }}>
-                  {T("Mensuel, 5,99 € / mois (8 dossiers / mois)", "Monthly, €5.99 / month (8 sets / month)")}
+                  {T("Mensuel, 5,99 € / mois (8 dossiers / mois)", "Monthly, €5.99 / month (8 sets / month)")}
                 </div>
               </a>
               <a href={stripeUrl(STRIPE_RECHARGE)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
@@ -5817,7 +5839,7 @@ export default function App() {
                   fontSize: "14px", fontWeight: 600,
                   borderRadius: "12px",
                 }}>
-                  {T("Recharge ponctuelle, 2,99 € (3 dossiers complets)", "One-time top-up, €2.99 (3 complete sets)")}
+                  {T("Recharge ponctuelle, 2,99 € (3 dossiers complets)", "One-time top-up, €2.99 (3 complete sets)")}
                 </div>
               </a>
             </div>

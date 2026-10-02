@@ -4754,14 +4754,16 @@ export default function App() {
     };
     return () => { DEMANDER_CONNEXION = null; };
   }, []);
-  useEffect(() => {
-    let apresGoogle = false;
-    try { apresGoogle = sessionStorage.getItem("achat_apres_connexion") === "1"; } catch { /* stockage indisponible */ }
-    if (session && (achatEnAttente || apresGoogle)) {
-      try { sessionStorage.removeItem("achat_apres_connexion"); } catch { /* stockage indisponible */ }
-      setAchatEnAttente(false); setShowAuth(false); setShowOffres(true);
-    }
-  }, [session, achatEnAttente]);
+  // Appelé à chaque changement de session : si un achat attendait la
+  // connexion (y compris après la redirection Google), on rouvre les offres.
+  const reprendreAchatApresConnexion = (s) => {
+    if (!s) return;
+    let attente = false;
+    try { attente = sessionStorage.getItem("achat_apres_connexion") === "1"; } catch { /* stockage indisponible */ }
+    if (!attente) return;
+    try { sessionStorage.removeItem("achat_apres_connexion"); } catch { /* stockage indisponible */ }
+    setAchatEnAttente(false); setShowAuth(false); setShowOffres(true);
+  };
   // Charge les credits du compte depuis la base (0 si deconnecte)
   const chargerCredits = async (s) => {
     if (!s) { setCredits(0); return; }
@@ -4773,8 +4775,8 @@ export default function App() {
     CURRENT_USER = s?.user ? { id: s.user.id, email: s.user.email || "" } : null;
   };
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => { setSession(data.session); majUtilisateurCourant(data.session); chargerCredits(data.session); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => { setSession(s); majUtilisateurCourant(s); chargerCredits(s); });
+    supabase.auth.getSession().then(({ data }) => { setSession(data.session); majUtilisateurCourant(data.session); chargerCredits(data.session); reprendreAchatApresConnexion(data.session); });
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => { setSession(s); majUtilisateurCourant(s); chargerCredits(s); reprendreAchatApresConnexion(s); });
     return () => sub.subscription.unsubscribe();
   }, []);
 

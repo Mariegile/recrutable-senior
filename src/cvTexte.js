@@ -27,7 +27,7 @@ function indexerSansAccents(texte) {
 // Retrouve dans le texte source la forme accentuée d'un mot-clé extrait
 // en désaccentué ("controle de gestion" -> "contrôle de gestion").
 // Si le mot n'est pas retrouvé tel quel, il est renvoyé inchangé.
-export function restaurerAccents(motNorm, texteSource) {
+export function restaurerAccents(motNorm, texteSource, { casse = false } = {}) {
   if (!motNorm || !texteSource) return motNorm;
   const { norm, pos } = indexerSansAccents(texteSource);
   const echappe = sansAccents(motNorm).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -35,7 +35,9 @@ export function restaurerAccents(motNorm, texteSource) {
   if (!m) return motNorm;
   const debut = m.index + m[1].length;
   const fin = debut + m[2].length;
-  return texteSource.slice(pos[debut], pos[fin]).toLowerCase();
+  const trouve = texteSource.slice(pos[debut], pos[fin]);
+  // casse : garde les sigles tels qu'écrits dans l'offre (« DCG », « BTS »)
+  return casse && trouve === trouve.toUpperCase() ? trouve : trouve.toLowerCase();
 }
 
 // Transforme les mots-clés absents du CV en questions lisibles pour le

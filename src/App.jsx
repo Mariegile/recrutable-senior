@@ -1467,7 +1467,9 @@ function extraireExperienceRequise(texteOffre) {
 }
 
 // ── Diplôme exigé (échelle EQF 3-8) et présence dans le CV ─────────
-function scanNiveauDiplome(texteNorm) {
+// mode "min" pour l'offre (« Bac+2 minimum (BTS, DCG) » : le Bac+2 suffit),
+// "max" pour le CV (le plus haut diplôme du candidat).
+function scanNiveauDiplome(texteNorm, mode = "max") {
   let niveau = null, libelle = null;
   for (const d of DIPLOMES_EQF) {
     for (const mot of d.mots) {
@@ -1478,7 +1480,7 @@ function scanNiveauDiplome(texteNorm) {
         ? /(?:titulaire d'une|diplome d'une|niveau|une|bac\+4,?)\s+maitrise\b|\bmaitrise\s+(?:en|\(bac)/
         : new RegExp(`(^|[^a-z0-9+])${mot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^a-z0-9]|$)`);
       if (rx.test(texteNorm)) {
-        if (niveau === null || d.niveau > niveau) { niveau = d.niveau; libelle = mot; }
+        if (niveau === null || (mode === "min" ? d.niveau < niveau : d.niveau > niveau)) { niveau = d.niveau; libelle = mot; }
         break;
       }
     }
@@ -1490,11 +1492,11 @@ function analyserDiplome(texteOffre, texteCV) {
   const aDesSections = sectionParLigne.some(s => s === "profil_requis");
   const zoneOffre = lignes.filter((_, i) => !aDesSections || sectionParLigne[i] === "profil_requis" || sectionParLigne[i] === null)
     .join("\n").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
-  const requis = scanNiveauDiplome(zoneOffre);
+  const requis = scanNiveauDiplome(zoneOffre, "min");
   if (requis.niveau === null) return null;
   const cvNorm = texteCV.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   const cv = scanNiveauDiplome(cvNorm);
-  return { niveau: requis.niveau, libelle: restaurerAccents(requis.libelle, texteOffre), present: cv.niveau !== null && cv.niveau >= requis.niveau };
+  return { niveau: requis.niveau, libelle: restaurerAccents(requis.libelle, texteOffre, { casse: true }), present: cv.niveau !== null && cv.niveau >= requis.niveau };
 }
 
 

@@ -17,3 +17,12 @@
 # Ping quotidien de Supabase (evite la mise en pause de l'offre gratuite).
 [functions."keepalive-supabase"]
   schedule = "@daily"
+
+# En-têtes de sécurité de base (aucune incidence sur Stripe ni Supabase)
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"

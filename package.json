@@ -9,9 +9,12 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "verifier-cv": "node --test scripts/verifier-cv.mjs",
-    "tester-webhook": "node --test scripts/tester-webhook.mjs"
+    "tester-webhook": "node --test scripts/tester-webhook.mjs",
+    "tester-conformite": "node --test scripts/tester-conformite.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/dm-sans": "^5.3.0",
+    "@fontsource-variable/fraunces": "^5.3.0",
     "@supabase/supabase-js": "^2.108.2",
     "pdfjs-dist": "^5.7.284",
     "react": "^19.2.6",

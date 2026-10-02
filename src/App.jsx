@@ -133,7 +133,7 @@ const C = {
   // Texte (contraste maximal pour lisibilité senior)
   text:          "#1A1612", // presque noir, chaud
   textSecondary: "#4A4138", // lecture secondaire
-  textMuted:     "#7A6F60", // labels, hints
+  textMuted:     "#6B6052", // labels, hints (4,9:1 minimum sur tous les fonds : WCAG AA)
 
   // Primaire, bleu marine profond (institutionnel, confiance)
   primary:      "#1B3A5C",
@@ -273,6 +273,39 @@ function ajouterCredits(n) {
 // dans la table `codes_cadeau` (Supabase) ; la fonction Netlify vérifie
 // le compte, l'expiration, le quota et crédite atomiquement.
 // Pour créer un code : INSERT dans la table (voir supabase-codes-cadeau.sql).
+// Preuve du consentement (CGV + renonciation au droit de rétractation),
+// horodatée côté serveur. Envoi non bloquant : le paiement s'ouvre aussitôt.
+async function enregistrerConsentement(offre) {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const jwt = data?.session?.access_token;
+    if (!jwt) return;
+    await fetch("/.netlify/functions/consentement", {
+      method: "POST", keepalive: true,
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
+      body: JSON.stringify({ offre, cgv: true, renonciation: true, lang: CURRENT_LANG }),
+    });
+  } catch { /* le journal serveur reste la seule trace en cas d'échec réseau */ }
+}
+
+// Résiliation / gestion de l'abonnement : session du portail client Stripe.
+async function ouvrirPortailClient() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const jwt = data?.session?.access_token;
+    if (!jwt) return { ok: false, raison: "connexion" };
+    const res = await fetch("/.netlify/functions/portail-client", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
+      body: JSON.stringify({ lang: CURRENT_LANG }),
+    });
+    const r = await res.json().catch(() => ({}));
+    return r.ok && r.url ? { ok: true, url: r.url } : { ok: false, raison: r.raison || "erreur" };
+  } catch {
+    return { ok: false, raison: "erreur" };
+  }
+}
+
 async function utiliserCodeCadeau(rawCode) {
   try {
     const code = String(rawCode || "").trim().toUpperCase();
@@ -2005,7 +2038,6 @@ p{margin-bottom:11px}
 // ═══════════════════════════════════════════════════════════════════
 
 const GLOBAL_STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
 
   * { box-sizing: border-box; }
   html, body {
@@ -2017,7 +2049,7 @@ const GLOBAL_STYLES = `
   }
 
   body {
-    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'DM Sans Variable', 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -2301,8 +2333,8 @@ const GLOBAL_STYLES = `
   }
 `;
 
-const FONT_SERIF = "'Fraunces', Georgia, 'Times New Roman', serif";
-const FONT_SANS  = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+const FONT_SERIF = "'Fraunces Variable', 'Fraunces', Georgia, 'Times New Roman', serif";
+const FONT_SANS  = "'DM Sans Variable', 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 // ═══════════════════════════════════════════════════════════════════
 //   COMPOSANTS UI
@@ -2622,7 +2654,7 @@ function HeroAccueil({ onStart }) {
                 }}
               />
               <text y="0" textAnchor="middle" fontSize="26" fontWeight="700"
-                    fill={C.success} fontFamily="Fraunces, Georgia, serif">88%</text>
+                    fill={C.success} fontFamily="'Fraunces Variable', Fraunces, Georgia, serif">88%</text>
               <text y="18" textAnchor="middle" fontSize="9" fontWeight="700"
                     fill={C.textMuted} letterSpacing="1.2">COMPATIBLE</text>
             </g>
@@ -2646,7 +2678,7 @@ function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
       onClick={() => setLang(code)}
       aria-label={code === "fr" ? "Français" : "English"}
       style={{
-        padding: "6px 11px",
+        padding: "6px 12px", minHeight: "36px", minWidth: "40px",
         border: "none",
         background: lang === code ? C.primary : "transparent",
         color: lang === code ? "#FFF" : C.textSecondary,
@@ -2744,7 +2776,7 @@ function CreditBadge({ credits, onClick }) {
         </div>
         <div className="credit-badge-value" style={{ fontSize: "20px", color, fontFamily: FONT_SERIF, fontWeight: 700, lineHeight: 1.2, display: "flex", alignItems: "baseline", gap: "6px" }}>
           {credits}
-          <span className="credit-badge-recharge" style={{ fontSize: "11px", color: C.textMuted, fontWeight: 600, opacity: hover ? 1 : 0.7 }}>
+          <span className="credit-badge-recharge" style={{ fontSize: "11px", color: C.textMuted, fontWeight: 600 }}>
             {T("(recharger)", "(top up)")}
           </span>
         </div>
@@ -2789,7 +2821,7 @@ function StepBar({ current }) {
                 {!last && <div style={{ width: "2px", flex: 1, minHeight: "18px", background: done ? C.success : C.border, margin: "3px 0" }}/>}
               </div>
               <div style={{ paddingTop: "7px", paddingBottom: last ? "0" : "10px" }}>
-                <div style={{ fontSize: "10px", letterSpacing: "0.07em", textTransform: "uppercase", color: C.textMuted, fontFamily: FONT_SANS, fontWeight: 600 }}>{T("Étape", "Step")} {s.id}</div>
+                <div style={{ fontSize: "12px", letterSpacing: "0.07em", textTransform: "uppercase", color: C.textMuted, fontFamily: FONT_SANS, fontWeight: 600 }}>{T("Étape", "Step")} {s.id}</div>
                 <div style={{ fontSize: "14.5px", fontFamily: FONT_SANS, fontWeight: active ? 700 : 500, color: active ? C.primary : done ? C.success : C.textSecondary, lineHeight: 1.25 }}>{s.label}</div>
               </div>
             </div>
@@ -4319,9 +4351,9 @@ function Footer() {
           {T("Vos données restent confidentielles · Paiement sécurisé Stripe · Conforme RGPD", "Your data stays confidential · Secure Stripe payment · GDPR compliant")}
         </p>
         <nav aria-label={T("Informations légales", "Legal information")} style={{ margin: "0 0 8px", fontSize: "13px", display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "4px 14px" }}>
-          <a href="/mentions-legales" style={{ color: C.textSecondary }}>{T("Mentions légales", "Legal notice")}</a>
-          <a href="/cgv" style={{ color: C.textSecondary }}>{T("CGV", "Terms of sale")}</a>
-          <a href="/confidentialite" style={{ color: C.textSecondary }}>{T("Confidentialité", "Privacy")}</a>
+          <a href="/mentions-legales" style={{ color: C.textSecondary, display: "inline-block", padding: "8px 4px" }}>{T("Mentions légales", "Legal notice")}</a>
+          <a href="/cgv" style={{ color: C.textSecondary, display: "inline-block", padding: "8px 4px" }}>{T("CGV", "Terms of sale")}</a>
+          <a href="/confidentialite" style={{ color: C.textSecondary, display: "inline-block", padding: "8px 4px" }}>{T("Confidentialité", "Privacy")}</a>
         </nav>
         <p style={{ margin: 0, fontSize: "13px" }}>
           © {new Date().getFullYear()} Recrutable · {T("Le service qui aide les candidats à décrocher plus d'entretiens", "The service that helps candidates land more interviews")}
@@ -4393,6 +4425,32 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
   const T = useT();
   const [codeInput, setCodeInput] = useState("");
   const [codeMsg, setCodeMsg] = useState(null);
+  // Case obligatoire avant paiement : décochée à chaque ouverture (la
+  // fenêtre est remontée via sa clé, voir le rendu dans App)
+  const [accepte, setAccepte] = useState(false);
+  const [rappelCase, setRappelCase] = useState(false);
+  const [portail, setPortail] = useState({ etat: "repos", msg: "" });
+
+  const acheter = (offre) => (e) => {
+    if (!accepte) {
+      e.preventDefault(); setRappelCase(true);
+      document.getElementById("case-cgv")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    exigerConnexion(e);
+    if (!e.defaultPrevented) enregistrerConsentement(offre);
+  };
+
+  const gererAbonnement = async () => {
+    if (!CURRENT_USER?.id) { DEMANDER_CONNEXION?.(); return; }
+    setPortail({ etat: "chargement", msg: "" });
+    const r = await ouvrirPortailClient();
+    if (r.ok) { window.location.href = r.url; return; }
+    const msg = r.raison === "aucun_abonnement"
+      ? T("Aucun abonnement ni achat Stripe n'est associé à ce compte.", "No Stripe subscription or purchase is linked to this account.")
+      : T(`La gestion en ligne est momentanément indisponible. Écrivez-nous à ${SUPPORT_EMAIL} pour résilier.`, `Online management is temporarily unavailable. Email ${SUPPORT_EMAIL} to cancel.`);
+    setPortail({ etat: "erreur", msg });
+  };
 
   // Empêche le scroll du body quand le modal est ouvert
   useEffect(() => {
@@ -4510,6 +4568,32 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
           {T("Choisissez la formule qui vous convient. Paiement sécurisé via Stripe.", "Choose the plan that suits you. Secure payment via Stripe.")}
         </p>
 
+        {/* Consentement obligatoire avant paiement (CGV + renonciation au
+            droit de rétractation, art. L221-28 13° C. conso) */}
+        <label id="case-cgv" style={{
+          display: "flex", gap: "12px", alignItems: "flex-start", cursor: "pointer",
+          background: accepte ? C.successSoft : (rappelCase ? C.warningSoft : C.bgSubtle),
+          border: `2px solid ${accepte ? C.success : (rappelCase ? C.warning : C.border)}`,
+          borderRadius: "12px", padding: "14px 14px", marginBottom: "16px",
+          fontSize: "14px", lineHeight: 1.5, color: C.text, textAlign: "left",
+        }}>
+          <input
+            type="checkbox" checked={accepte}
+            onChange={e => { setAccepte(e.target.checked); if (e.target.checked) setRappelCase(false); }}
+            style={{ width: "24px", height: "24px", margin: "1px 0 0", flexShrink: 0, accentColor: C.success, cursor: "pointer" }}
+          />
+          <span>
+            {T("J'accepte les ", "I accept the ")}
+            <a href="/cgv" target="_blank" rel="noopener" onClick={e => e.stopPropagation()} style={{ color: C.primary, fontWeight: 600 }}>{T("conditions générales de vente", "terms of sale")}</a>
+            {T(". Je demande l'accès immédiat aux crédits et je renonce à mon droit de rétractation dès leur utilisation.", ". I request immediate access to the credits and waive my right of withdrawal as soon as they are used.")}
+          </span>
+        </label>
+        {rappelCase && !accepte && (
+          <div role="alert" style={{ fontSize: "14px", fontWeight: 600, color: C.warningText, margin: "-8px 0 14px", textAlign: "left" }}>
+            {T("Cochez la case ci-dessus pour continuer vers le paiement.", "Tick the box above to continue to payment.")}
+          </div>
+        )}
+
         {/* Cartes empilées */}
         <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
           {OFFRES.map(o => (
@@ -4524,7 +4608,7 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
                 <div style={{
                   position: "absolute", top: "-10px", right: "16px",
                   background: o.color, color: "#FFF",
-                  fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "10px",
+                  fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "10px",
                   letterSpacing: "0.04em",
                 }}>
                   {o.badge}
@@ -4554,7 +4638,9 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
                 ))}
               </div>
 
-              <a href={o.href} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+              <a href={o.href} onClick={acheter(o.key)} target="_blank" rel="noopener noreferrer"
+                aria-disabled={!accepte} data-offre={o.key}
+                style={{ textDecoration: "none", display: "block", opacity: accepte ? 1 : 0.45, cursor: accepte ? "pointer" : "not-allowed" }}>
                 <div style={{
                   minHeight: "52px",
                   padding: "14px 18px",
@@ -4564,7 +4650,7 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
                   fontSize: "15px",
                   fontWeight: 700,
                   textAlign: "center",
-                  cursor: "pointer",
+                  cursor: "inherit",
                   fontFamily: FONT_SANS,
                 }}>
                   {o.cta}
@@ -4577,10 +4663,22 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
         <div style={{ textAlign: "center", fontSize: "13px", color: C.textMuted, marginBottom: "12px" }}>
           {T("🔒 Paiement 100 % sécurisé · Sans engagement · RGPD", "🔒 100% secure payment · No commitment · GDPR")}
           <br/>
-          {T("En payant, vous acceptez nos ", "By paying, you accept our ")}
-          <a href="/cgv" target="_blank" rel="noopener" style={{ color: C.primary, fontWeight: 600 }}>{T("conditions générales de vente", "terms of sale")}</a>
-          {T(" et notre ", " and our ")}
-          <a href="/confidentialite" target="_blank" rel="noopener" style={{ color: C.primary, fontWeight: 600 }}>{T("politique de confidentialité", "privacy policy")}</a>.
+          <a href="/confidentialite" target="_blank" rel="noopener" style={{ color: C.primary, fontWeight: 600 }}>{T("Politique de confidentialité", "Privacy policy")}</a>
+        </div>
+
+        {/* Résiliation / gestion en ligne de l'abonnement (portail client Stripe) */}
+        <div style={{ textAlign: "center", marginBottom: "16px" }}>
+          <button
+            onClick={gererAbonnement} disabled={portail.etat === "chargement"}
+            style={{
+              minHeight: "48px", padding: "12px 18px", borderRadius: "10px",
+              border: `2px solid ${C.primary}`, background: C.bgCard, color: C.primary,
+              fontSize: "15px", fontWeight: 700, fontFamily: FONT_SANS, cursor: "pointer",
+            }}
+          >
+            {portail.etat === "chargement" ? T("Ouverture…", "Opening…") : T("Gérer ou résilier mon abonnement", "Manage or cancel my subscription")}
+          </button>
+          {portail.msg && <div role="alert" style={{ marginTop: "8px", fontSize: "14px", color: C.error, fontWeight: 600 }}>{portail.msg}</div>}
         </div>
 
         {/* Info paiement automatique */}
@@ -5182,6 +5280,7 @@ export default function App() {
       )}
 
       <OffresModal
+        key={showOffres ? "offres-ouvertes" : "offres-fermees"}
         open={showOffres}
         onClose={() => setShowOffres(false)}
         credits={credits}
@@ -5815,46 +5914,19 @@ export default function App() {
               {T("Choisissez la formule qui vous convient pour continuer à optimiser vos candidatures :", "Choose the plan that suits you to keep optimizing your applications:")}
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "420px", margin: "0 auto" }}>
-              <a href={stripeUrl(STRIPE_ANNUEL)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <div style={{
-                  padding: "16px 20px",
-                  background: C.accent, color: "#FFF",
-                  fontSize: "16px", fontWeight: 700,
-                  borderRadius: "12px", position: "relative",
-                  boxShadow: "0 4px 12px rgba(168,93,44,0.25)",
-                }}>
-                  <div style={{ position: "absolute", top: "-10px", right: "16px", background: C.success, color: "#FFF", fontSize: "11px", padding: "3px 10px", borderRadius: "10px", fontWeight: 700 }}>
-                    {T("★ Meilleure offre", "★ Best value")}
-                  </div>
-                  {T("Annuel, 49,99 € (60 dossiers complets)", "Annual, €49.99 (60 complete sets)")}
-                </div>
-              </a>
-              <a href={stripeUrl(STRIPE_MENSUEL)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <div style={{
-                  padding: "14px 20px",
-                  background: C.bgCard, color: C.primary,
-                  border: `2px solid ${C.primary}`,
-                  fontSize: "15px", fontWeight: 600,
-                  borderRadius: "12px",
-                }}>
-                  {T("Mensuel, 5,99 € / mois (8 dossiers / mois)", "Monthly, €5.99 / month (8 sets / month)")}
-                </div>
-              </a>
-              <a href={stripeUrl(STRIPE_RECHARGE)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <div style={{
-                  padding: "14px 20px",
-                  background: C.bgCard, color: C.textSecondary,
-                  border: `1px solid ${C.borderStrong}`,
-                  fontSize: "14px", fontWeight: 600,
-                  borderRadius: "12px",
-                }}>
-                  {T("Recharge ponctuelle, 2,99 € (3 dossiers complets)", "One-time top-up, €2.99 (3 complete sets)")}
-                </div>
-              </a>
+            <div style={{ maxWidth: "420px", margin: "0 auto" }}>
+              <button onClick={() => setShowOffres(true)} className="primary-btn" style={{
+                width: "100%", minHeight: "56px", padding: "16px 20px",
+                background: C.accent, color: "#FFF", border: "none",
+                fontSize: "16px", fontWeight: 700, fontFamily: FONT_SANS,
+                borderRadius: "12px", cursor: "pointer",
+                boxShadow: "0 4px 12px rgba(168,93,44,0.25)",
+              }}>
+                {T("Voir les formules (dès 2,99 €)", "See the plans (from €2.99)")}
+              </button>
             </div>
 
-            <div style={{ fontSize: "12px", color: C.textMuted, marginTop: "16px", fontStyle: "italic" }}>
+            <div style={{ fontSize: "13px", color: C.textMuted, marginTop: "16px", fontStyle: "italic" }}>
               {T("🔒 Paiement sécurisé Stripe · Sans engagement", "🔒 Secure Stripe payment · No commitment")}
             </div>
           </div>

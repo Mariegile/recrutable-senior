@@ -13,11 +13,11 @@ const MAJ_EN = "October 2, 2026";
 
 const C = {
   bg: "#F5F0E8", card: "#FFFFFF", subtle: "#FAF7F2", border: "#E5DDD0",
-  text: "#1A1612", text2: "#4A4138", muted: "#7A6F60",
+  text: "#1A1612", text2: "#4A4138", muted: "#6B6052",
   primary: "#1B3A5C", accent: "#A85D2C", warnBg: "#FAF1DC", warnText: "#7A5A14",
 };
-const SERIF = "'Fraunces', Georgia, 'Times New Roman', serif";
-const SANS = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+const SERIF = "'Fraunces Variable', 'Fraunces', Georgia, 'Times New Roman', serif";
+const SANS = "'DM Sans Variable', 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 // ── Contenus ────────────────────────────────────────────────────────
 // Chaque page : { titre, intro?, sections: [{ h, p: [paragraphes | listes] }] }
@@ -105,12 +105,13 @@ const CGV = {
       { h: "4. Commande et paiement", p: [
         "Le paiement est effectué par carte bancaire via Stripe (Stripe Payments Europe Ltd). Recrutable n'a jamais accès à vos numéros de carte.",
         "Les crédits sont ajoutés automatiquement au compte utilisé pour l'achat dès la confirmation du paiement par Stripe, en général en quelques secondes. Un reçu est envoyé par Stripe à l'adresse e-mail indiquée lors du paiement.",
-        "Abonnements : ils sont renouvelés automatiquement à chaque échéance (mois ou année) jusqu'à résiliation. Vous pouvez résilier à tout moment, la résiliation prenant effet à la fin de la période en cours, [À COMPLÉTER : moyen de résiliation, par exemple lien du portail client Stripe ou fonction « Résilier » dans le compte ; à défaut, par e-mail à " + EMAIL + "].",
+        "Abonnements : ils sont renouvelés automatiquement à chaque échéance (mois ou année) jusqu'à résiliation. Vous pouvez résilier à tout moment, la résiliation prenant effet à la fin de la période en cours, en ligne, depuis le bouton « Gérer ou résilier mon abonnement » de la fenêtre « Recharger mon compte » (portail client sécurisé de Stripe), ou par e-mail à " + EMAIL + ".",
       ] },
       { h: "5. Fourniture du service et droit de rétractation", p: [
         "Les crédits et les documents générés sont des contenus numériques fournis immédiatement après le paiement, sans support matériel.",
         "Conformément à l'article L221-28, 13° du Code de la consommation, le droit de rétractation ne peut pas être exercé pour un contenu numérique dont l'exécution a commencé, après votre accord préalable exprès et votre renoncement exprès à ce droit, recueillis avant le paiement.",
-        "[À COMPLÉTER / À METTRE EN PLACE : case à cocher avant le paiement, par exemple « Je demande l'accès immédiat à mes crédits et je renonce à mon droit de rétractation », et confirmation de ce choix par e-mail. Tant que ce recueil n'existe pas, le droit de rétractation de 14 jours reste applicable : un achat peut alors être remboursé sur simple demande dans ce délai.]",
+        "Avant tout paiement, vous devez cocher la case : « J'accepte les conditions générales de vente. Je demande l'accès immédiat aux crédits et je renonce à mon droit de rétractation dès leur utilisation. » Votre accord est enregistré et horodaté sur nos serveurs. Tant qu'aucun crédit acheté n'a été utilisé, vous pouvez demander le remboursement de l'achat dans les 14 jours.",
+        "[À COMPLÉTER : confirmation de l'accord sur support durable, par exemple mention dans le reçu ou la facture Stripe envoyés par e-mail.]",
       ] },
       { h: "6. Échec technique et remboursement", p: [
         "Si la réécriture échoue pour une raison technique (erreur du service d'intelligence artificielle, réponse incomplète, coupure), le crédit débité est automatiquement recrédité sur votre compte.",
@@ -155,12 +156,13 @@ const CGV = {
       { h: "4. Order and payment", p: [
         "Payment is made by card through Stripe. Recrutable never sees your card numbers.",
         "Credits are added automatically to the account used for the purchase once Stripe confirms the payment. Stripe emails a receipt.",
-        "Subscriptions renew automatically until cancelled. You can cancel at any time, effective at the end of the current period, [TO COMPLETE: cancellation method].",
+        "Subscriptions renew automatically until cancelled. You can cancel at any time, effective at the end of the current period, online with the « Manage or cancel my subscription » button (Stripe secure customer portal) or by email.",
       ] },
       { h: "5. Delivery and right of withdrawal", p: [
         "Credits and generated documents are digital content supplied immediately after payment.",
         "Under article L221-28 13° of the French Consumer Code, the right of withdrawal does not apply to digital content whose supply has started with your prior express consent and express waiver of that right, collected before payment.",
-        "[TO COMPLETE / TO IMPLEMENT: checkbox before payment and email confirmation. Until then, the 14-day right of withdrawal applies.]",
+        "Before paying, you must tick a box accepting these terms, requesting immediate access to the credits and waiving your right of withdrawal once they are used. Your consent is recorded and timestamped on our servers. As long as no purchased credit has been used, you may request a refund within 14 days.",
+        "[TO COMPLETE: confirmation on a durable medium, e.g. in the Stripe receipt or invoice.]",
       ] },
       { h: "6. Technical failure and refunds", p: [
         "If a rewrite fails for a technical reason, the credit is automatically returned to your account.",
@@ -188,6 +190,7 @@ const CONFIDENTIALITE = {
       { h: "Données traitées", p: [
         { liste: [
           "Compte : adresse e-mail, identifiant technique, mot de passe (stocké sous forme chiffrée par Supabase) ou, en cas de connexion Google, les informations transmises par Google (e-mail, nom, photo de profil).",
+          "Consentement avant paiement : date et heure, offre choisie, version du texte accepté (CGV et renonciation au droit de rétractation).",
           "Crédits et paiements : solde de crédits, historique des mouvements (date, nombre de crédits, référence de la session de paiement Stripe), identifiant client Stripe. Les données de carte bancaire sont traitées uniquement par Stripe.",
           "CV et offres d'emploi : l'analyse gratuite est réalisée dans votre navigateur, sans envoi à nos serveurs. Pour la réécriture, la lettre, la traduction et les pistes de reconversion, le texte du CV et de l'offre est envoyé à nos fonctions serveur puis au service d'intelligence artificielle d'Anthropic, le temps du traitement. Nous ne conservons pas vos CV ni vos offres sur nos serveurs.",
           "Données d'utilisation : nombre d'utilisations par jour et par action (limites anti-abus), adresse IP utilisée temporairement pour limiter le nombre de requêtes, journaux techniques de l'hébergeur.",
@@ -197,6 +200,7 @@ const CONFIDENTIALITE = {
         { liste: [
           "Fournir le service, gérer votre compte, vos crédits et vos achats : exécution du contrat.",
           "Tenir la comptabilité et conserver les pièces de paiement : obligation légale.",
+          "Conserver la preuve de votre accord avant paiement : obligation légale et intérêt légitime (preuve en cas de litige).",
           "Sécuriser le service et prévenir les abus (limites de requêtes, quotas) : intérêt légitime.",
         ] },
         "Vos données ne sont ni vendues, ni utilisées à des fins publicitaires, ni utilisées pour entraîner des modèles d'intelligence artificielle par Recrutable.",
@@ -207,6 +211,7 @@ const CONFIDENTIALITE = {
           "Côté Anthropic : traitement le temps de la requête, puis conservation limitée selon la politique de l'API d'Anthropic [À COMPLÉTER : durée actuelle indiquée par Anthropic, à vérifier].",
           "Compte et solde de crédits : tant que le compte existe ; supprimés sur demande [À COMPLÉTER : durée d'inactivité au-delà de laquelle le compte est supprimé].",
           "Historique des paiements et transactions : 10 ans (obligation comptable).",
+          "Preuves de consentement avant paiement : durée de la relation contractuelle, puis 5 ans (prescription).",
           "Compteurs d'utilisation quotidiens : [À COMPLÉTER : durée réelle de conservation en base].",
           "Adresse IP pour la limitation des requêtes : en mémoire, quelques minutes, non enregistrée. Journaux de l'hébergeur : selon la politique de Netlify.",
         ] },
@@ -217,7 +222,7 @@ const CONFIDENTIALITE = {
           "Supabase Inc. (base de données, comptes et authentification) [À COMPLÉTER : région d'hébergement].",
           "Stripe Payments Europe Ltd (paiement), Irlande, avec des transferts possibles vers Stripe, Inc. aux États-Unis.",
           "Anthropic PBC (intelligence artificielle : réécriture, lettre, traduction), États-Unis. Le contenu de votre CV et de l'offre lui est transmis pour chaque génération.",
-          "Google (connexion avec Google si vous la choisissez ; polices de caractères Google Fonts chargées depuis les serveurs de Google, qui reçoivent votre adresse IP).",
+          "Google (uniquement si vous choisissez la connexion avec Google). Les polices de caractères sont hébergées sur notre site : aucun appel à Google Fonts.",
         ] },
       ] },
       { h: "Transferts hors de l'Union européenne", p: [
@@ -276,7 +281,7 @@ const CONFIDENTIALITE = {
           "Supabase Inc. (database and authentication) [TO COMPLETE: region].",
           "Stripe Payments Europe Ltd (payments), Ireland, with possible transfers to the USA.",
           "Anthropic PBC (artificial intelligence), USA.",
-          "Google (Google sign-in; Google Fonts loaded from Google servers, which receive your IP address).",
+          "Google (only if you choose Google sign-in). Fonts are self-hosted: no call to Google Fonts.",
         ] },
       ] },
       { h: "Transfers outside the EU", p: [
@@ -339,7 +344,7 @@ export default function PagesLegales({ chemin }) {
           <div style={{ display: "inline-flex", background: C.subtle, border: `1px solid ${C.border}`, borderRadius: "9px", padding: "2px", flexShrink: 0 }}>
             {["fr", "en"].map(l => (
               <button key={l} onClick={() => setLang(l)} aria-label={l === "fr" ? "Français" : "English"} style={{
-                padding: "6px 11px", border: "none", borderRadius: "7px", cursor: "pointer",
+                padding: "6px 12px", minHeight: "36px", minWidth: "40px", border: "none", borderRadius: "7px", cursor: "pointer",
                 background: lang === l ? C.primary : "transparent", color: lang === l ? "#FFF" : C.text2,
                 fontSize: "13px", fontWeight: 700, fontFamily: SANS, lineHeight: 1,
               }}>{l.toUpperCase()}</button>

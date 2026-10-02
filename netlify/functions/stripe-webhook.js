@@ -5,7 +5,8 @@
 //                 SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 //
 //  Événements à activer dans le Dashboard Stripe :
-//    checkout.session.completed  ET  invoice.paid
+//    checkout.session.completed, checkout.session.async_payment_succeeded
+//    ET invoice.paid
 //
 //  Crédits déterminés par le PRODUIT/PRIX acheté (robuste aux codes promo
 //  et aux changements de prix), avec repli sur le montant exact si le
@@ -174,7 +175,10 @@ function creerHandler(deps) {
 
     try {
       // ── 1. Paiement via Payment Link / Checkout ────────────────────
-      if (stripeEvent.type === "checkout.session.completed") {
+      // async_payment_succeeded : moyens de paiement différés (la session
+      // s'est terminée en "unpaid", le paiement arrive plus tard).
+      if (stripeEvent.type === "checkout.session.completed" ||
+          stripeEvent.type === "checkout.session.async_payment_succeeded") {
         const s = stripeEvent.data.object;
 
         // "no_payment_required" = code promo à 100 % : on crédite aussi.

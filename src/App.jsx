@@ -4318,6 +4318,11 @@ function Footer() {
         <p style={{ margin: "0 0 8px", fontSize: "13px" }}>
           {T("Vos données restent confidentielles · Paiement sécurisé Stripe · Conforme RGPD", "Your data stays confidential · Secure Stripe payment · GDPR compliant")}
         </p>
+        <nav aria-label={T("Informations légales", "Legal information")} style={{ margin: "0 0 8px", fontSize: "13px", display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "4px 14px" }}>
+          <a href="/mentions-legales" style={{ color: C.textSecondary }}>{T("Mentions légales", "Legal notice")}</a>
+          <a href="/cgv" style={{ color: C.textSecondary }}>{T("CGV", "Terms of sale")}</a>
+          <a href="/confidentialite" style={{ color: C.textSecondary }}>{T("Confidentialité", "Privacy")}</a>
+        </nav>
         <p style={{ margin: 0, fontSize: "13px" }}>
           © {new Date().getFullYear()} Recrutable · {T("Le service qui aide les candidats à décrocher plus d'entretiens", "The service that helps candidates land more interviews")}
         </p>
@@ -4571,6 +4576,11 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
 
         <div style={{ textAlign: "center", fontSize: "13px", color: C.textMuted, marginBottom: "12px" }}>
           {T("🔒 Paiement 100 % sécurisé · Sans engagement · RGPD", "🔒 100% secure payment · No commitment · GDPR")}
+          <br/>
+          {T("En payant, vous acceptez nos ", "By paying, you accept our ")}
+          <a href="/cgv" target="_blank" rel="noopener" style={{ color: C.primary, fontWeight: 600 }}>{T("conditions générales de vente", "terms of sale")}</a>
+          {T(" et notre ", " and our ")}
+          <a href="/confidentialite" target="_blank" rel="noopener" style={{ color: C.primary, fontWeight: 600 }}>{T("politique de confidentialité", "privacy policy")}</a>.
         </div>
 
         {/* Info paiement automatique */}

@@ -2348,7 +2348,7 @@ function PaymentSuccessBanner({ formule, etat, credits, onClose }) {
           {T("Paiement reçu, merci !", "Payment received, thank you!")}
         </div>
         <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.5 }}>
-          {T("Votre ", "Your ")}<strong>{config.label}</strong>{T(" est enregistré.", " is recorded.")}
+          {T("Votre achat « ", "Your purchase “")}<strong>{config.label}</strong>{T(" » est enregistré.", "” is recorded.")}
           <br/>
           {etat === "confirme" && <>
             <strong style={{ color: C.success }}>+{config.ajout} {T("crédits", "credits")}</strong> {T("ajoutés à votre compte", "added to your account")}

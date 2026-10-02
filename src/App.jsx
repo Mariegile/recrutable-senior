@@ -2182,20 +2182,38 @@ const GLOBAL_STYLES = `
       height: 24px !important;
     }
     .app-header-tagline {
-      font-size: 13px !important;
+      font-size: 12.5px !important;
       margin-top: 2px !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
     }
+    /* En-tête en 2 rangées : logo + slogan sur une ligne, puis les actions
+       (FR/EN, compte, crédits) sur toute la largeur. E-mail masqué
+       (visible en info-bulle du bouton Déconnexion). */
+    .app-header-inner {
+      flex-wrap: wrap !important;
+      gap: 10px 12px !important;
+    }
+    .app-header-brand { flex: 1 1 100% !important; min-width: 0 !important; }
+    .app-header-actions {
+      flex: 1 1 100% !important;
+      flex-wrap: nowrap !important;
+      justify-content: space-between !important;
+      gap: 8px !important;
+      min-width: 0 !important;
+    }
+    .app-header-email { display: none !important; }
+    .app-header-logout { padding: 8px 10px !important; white-space: nowrap !important; }
 
-    /* 6. CREDIT BADGE plus petit */
-    .credit-badge {
-      padding: 8px 12px !important;
-    }
-    .credit-badge-label {
-      font-size: 11px !important;
-    }
-    .credit-badge-value {
-      font-size: 18px !important;
-    }
+    /* 6. CREDIT BADGE compact : icône + nombre (libellé en aria-label) */
+    .credit-badge { padding: 6px 10px !important; gap: 6px !important; flex-shrink: 0 !important; }
+    .credit-badge-label, .credit-badge-recharge { display: none !important; }
+    .credit-badge-value { font-size: 18px !important; }
+
+    /* Bannière de retour de paiement : marges et icône réduites */
+    .payment-banner { top: 12px !important; left: 10px !important; right: 10px !important; padding: 14px 12px 14px 14px !important; gap: 10px !important; }
+    .payment-banner-emoji { font-size: 28px !important; }
 
     /* 7. Conteneur principal : padding réduit */
     .app-main-container {
@@ -2326,26 +2344,28 @@ function PaymentSuccessBanner({ formule, etat, credits, onClose }) {
   if (!config) return null;
 
   return (
-    <div style={{
-      position: "fixed", top: "20px", left: "50%",
-      transform: "translateX(-50%)",
+    // Centrage sans transform : l'animation fadeIn anime transform et
+    // écraserait un translateX(-50%) (bannière décalée hors écran).
+    <div className="payment-banner" style={{
+      position: "fixed", top: "20px", left: "16px", right: "16px",
+      margin: "0 auto",
       zIndex: 10000,
-      maxWidth: "520px", width: "calc(100% - 32px)",
+      maxWidth: "520px", boxSizing: "border-box",
       background: C.bgCard,
       border: `2px solid ${C.success}`,
       borderRadius: "14px",
       boxShadow: "0 12px 40px rgba(30,107,71,0.25)",
       padding: "18px 22px",
       display: "flex", alignItems: "flex-start", gap: "14px",
-      fontFamily: FONT_SANS,
+      fontFamily: FONT_SANS, textAlign: "left",
       animation: "fadeIn 0.4s ease",
     }}>
-      <div style={{ fontSize: "36px", lineHeight: 1, flexShrink: 0 }}>
+      <div className="payment-banner-emoji" style={{ fontSize: "36px", lineHeight: 1, flexShrink: 0 }}>
         {config.emoji}
       </div>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
         <div style={{ fontSize: "17px", fontWeight: 700, color: C.success, fontFamily: FONT_SERIF, marginBottom: "4px" }}>
-          {T("Paiement reçu, merci !", "Payment received, thank you!")}
+          {T("Paiement reçu, merci !", "Payment received, thank you!")}
         </div>
         <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.5 }}>
           {T("Votre achat « ", "Your purchase “")}<strong>{config.label}</strong>{T(" » est enregistré.", "” is recorded.")}
@@ -2646,7 +2666,7 @@ function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
         maxWidth: "780px", margin: "0 auto",
         display: "flex", alignItems: "center", justifyContent: "space-between", gap: "16px",
       }}>
-        <div>
+        <div className="app-header-brand">
           {/* Logo (wordmark). Le H1 de la page porte la promesse, dans le hero. */}
           <img
             src="/logo-recrutable.svg" alt="Recrutable"
@@ -2671,7 +2691,7 @@ function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
             {T("Un CV taillé pour chaque offre que vous visez", "A résumé tailored to every job you target")}
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div className="app-header-actions" style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
           {/* Onglet de langue FR / EN */}
           <div style={{ display: "inline-flex", background: C.bgSubtle, border: `1px solid ${C.border}`, borderRadius: "9px", padding: "2px" }}>
             {langBtn("fr", "FR")}
@@ -2679,8 +2699,8 @@ function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
           </div>
           {session ? (
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "13px", color: C.textMuted, fontFamily: FONT_SANS, maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.user?.email}</span>
-              <button onClick={onLogout} style={{ padding: "8px 12px", background: C.bgSubtle, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "13px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>{T("Déconnexion", "Log out")}</button>
+              <span className="app-header-email" style={{ fontSize: "13px", color: C.textMuted, fontFamily: FONT_SANS, maxWidth: "150px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.user?.email}</span>
+              <button onClick={onLogout} className="app-header-logout" title={session.user?.email || ""} style={{ padding: "8px 12px", background: C.bgSubtle, color: C.textSecondary, border: `1px solid ${C.border}`, borderRadius: "8px", fontSize: "13px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>{T("Déconnexion", "Log out")}</button>
             </div>
           ) : (
             <button onClick={onLogin} style={{ padding: "9px 16px", background: C.primary, color: "#FFF", border: "none", borderRadius: "9px", fontSize: "14px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>{T("Se connecter", "Log in")}</button>
@@ -2703,6 +2723,8 @@ function CreditBadge({ credits, onClick }) {
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       title={T("Cliquez pour voir les abonnements et recharges", "Click to see subscriptions and top-ups")}
+      aria-label={T(`Diagnostics restants : ${credits}. Recharger`, `Diagnostics left: ${credits}. Top up`)}
+      className="credit-badge"
       style={{
         background: bg,
         border: `2px solid ${hover ? color : `${color}40`}`,
@@ -2717,12 +2739,12 @@ function CreditBadge({ credits, onClick }) {
     >
       <span style={{ fontSize: "18px" }}>🎟️</span>
       <div style={{ textAlign: "left" }}>
-        <div style={{ fontSize: "12px", color: C.textMuted, fontFamily: FONT_SANS, fontWeight: 500, lineHeight: 1 }}>
+        <div className="credit-badge-label" style={{ fontSize: "12px", color: C.textMuted, fontFamily: FONT_SANS, fontWeight: 500, lineHeight: 1 }}>
           {T("Diagnostics restants", "Diagnostics left")}
         </div>
-        <div style={{ fontSize: "20px", color, fontFamily: FONT_SERIF, fontWeight: 700, lineHeight: 1.2, display: "flex", alignItems: "baseline", gap: "6px" }}>
+        <div className="credit-badge-value" style={{ fontSize: "20px", color, fontFamily: FONT_SERIF, fontWeight: 700, lineHeight: 1.2, display: "flex", alignItems: "baseline", gap: "6px" }}>
           {credits}
-          <span style={{ fontSize: "11px", color: C.textMuted, fontWeight: 600, opacity: hover ? 1 : 0.7 }}>
+          <span className="credit-badge-recharge" style={{ fontSize: "11px", color: C.textMuted, fontWeight: 600, opacity: hover ? 1 : 0.7 }}>
             {T("(recharger)", "(top up)")}
           </span>
         </div>

@@ -107,7 +107,8 @@ export function separerTheme(ligne) {
   if (i <= 0 || i > 60) return { theme: "", elements: [s] };
   return {
     theme: s.slice(0, i).trim(),
-    elements: s.slice(i + 3).split(/\s*,\s*/).map(x => x.trim()).filter(Boolean),
+    // virgules hors parenthèses : « Cuisine (entrées, plats), Liaison froide »
+    elements: s.slice(i + 3).split(/\s*,\s*(?![^()]*\))/).map(x => x.trim()).filter(Boolean),
   };
 }
 

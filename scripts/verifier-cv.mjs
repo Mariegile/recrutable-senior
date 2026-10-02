@@ -57,6 +57,9 @@ test("compétences regroupées par thème : aller-retour sans perte", () => {
   assert.deepEqual(lignes, ["Hygiène : HACCP, Traçabilité", "Liaison froide"]);
   assert.deepEqual(separerTheme(lignes[0]), { theme: "Hygiène", elements: ["HACCP", "Traçabilité"] });
   assert.deepEqual(separerTheme(lignes[1]), { theme: "", elements: ["Liaison froide"] });
+  // virgules entre parenthèses conservées (cas réel de la preview)
+  assert.deepEqual(separerTheme("Production culinaire : Cuisine traditionnelle (entrées, plats, desserts), Liaison froide").elements,
+    ["Cuisine traditionnelle (entrées, plats, desserts)", "Liaison froide"]);
 });
 
 test("le contrôle détecte bien les défauts de l'ancienne sortie", () => {

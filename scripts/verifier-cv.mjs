@@ -38,6 +38,11 @@ test("questions Oui/Non : expressions de l'offre, pas le nom de l'employeur", ()
     ["haccp", "régimes"], OFFRE);
   // « normes » (devant HACCP) et « alimentaires » (après régimes) : notions déjà dans le CV
   assert.deepEqual(q, ["contrôle de gestion", "restauration collective"]);
+  // jamais de question sur un mot vague
+  assert.deepEqual(preparerQuestions(["gestion", "cegid"], [], "Titre
+
+- gestion
+- logiciel cegid"), ["cegid"]);
   // pas de fusion à cheval sur deux lignes
   assert.deepEqual(preparerQuestions(["entreprise", "anglais"], [], "Titre\n- 5 ans en entreprise\n- anglais"), ["entreprise", "anglais"]);
 });

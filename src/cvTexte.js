@@ -61,9 +61,14 @@ export function preparerQuestions(manquants, presents, texteOffre) {
   const couverts = new Set(presents.flatMap(k => sansAccents(k).split(/\s+/)));
   const corpsNorm = " " + sansAccents(corps.join(" ")).replace(/[^a-z0-9]+/g, " ") + " ";
   const forme = (m) => (m.length >= 2 && m === m.toUpperCase() && /\p{L}/u.test(m)) ? m : m.toLowerCase();
+  // Mots trop vagues pour une question honnête (« gestion » de quoi ?) :
+  // un « Oui » ouvrirait la porte à n'importe quelle mission de l'offre.
+  const VAGUES = new Set(["gestion", "cuisine", "competences", "competence", "management", "organisation", "travail",
+    "equipe", "qualite", "suivi", "controle", "production", "hotelier", "service", "pratique", "connaissances"]);
   const out = [];
   for (const k of manquants) {
     const kn = sansAccents(k);
+    if (VAGUES.has(kn)) continue;
     if (!corpsNorm.includes(" " + kn.replace(/[^a-z0-9]+/g, " ").trim() + " ")) continue;
     let phrase = k;
     if (!/\s/.test(k)) {

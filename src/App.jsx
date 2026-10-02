@@ -2854,7 +2854,7 @@ function StepBar({ current }) {
           marginBottom: "10px", fontFamily: FONT_SANS,
         }}>
           <div style={{ fontSize: "13px", color: C.textMuted, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-            Étape {current} sur {steps.length}
+            {T("Étape", "Step")} {current} {T("sur", "of")} {steps.length}
           </div>
           <div style={{ fontSize: "14px", color: C.primary, fontWeight: 700 }}>
             {steps[current - 1]?.label}
@@ -4404,29 +4404,29 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
     {
       key: "annuel",
       label: T("Abonnement annuel", "Annual subscription"),
-      prix: "49,99 €", sous: T("soit 4,16 € / mois", "that's €4.16 / month"),
+      prix: "49,99 €", sous: T("soit 4,16 € / mois", "that's €4.16 / month"),
       items: [T("60 dossiers complets dans l'année", "60 complete sets per year"), T("Économisez 30 % vs mensuel", "Save 30% vs monthly"), T("Accès complet 12 mois", "Full access for 12 months")],
       href: stripeUrl(STRIPE_ANNUEL),
-      cta: T("Choisir l'annuel, 49,99 €", "Choose annual, €49.99"),
+      cta: T("Choisir l'annuel, 49,99 €", "Choose annual, €49.99"),
       badge: T("★ Meilleure offre", "★ Best value"),
       color: C.accent,
     },
     {
       key: "mensuel",
       label: T("Abonnement mensuel", "Monthly subscription"),
-      prix: "5,99 €", sous: T("par mois, sans engagement", "per month, no commitment"),
+      prix: "5,99 €", sous: T("par mois, sans engagement", "per month, no commitment"),
       items: [T("8 dossiers complets par mois", "8 complete sets per month"), T("Résiliable à tout moment", "Cancel anytime"), T("Idéal pour candidater régulièrement", "Great for applying regularly")],
       href: stripeUrl(STRIPE_MENSUEL),
-      cta: T("S'abonner, 5,99 € / mois", "Subscribe, €5.99 / month"),
+      cta: T("S'abonner, 5,99 € / mois", "Subscribe, €5.99 / month"),
       color: C.primary,
     },
     {
       key: "recharge",
       label: T("Recharge rapide", "Quick top-up"),
-      prix: "2,99 €", sous: T("paiement unique", "one-time payment"),
+      prix: "2,99 €", sous: T("paiement unique", "one-time payment"),
       items: [T("3 dossiers complets", "3 complete sets"), T("Sans abonnement", "No subscription"), T("Utilisable immédiatement", "Usable immediately")],
       href: stripeUrl(STRIPE_RECHARGE),
-      cta: T("Prendre la recharge, 2,99 €", "Get the top-up, €2.99"),
+      cta: T("Prendre la recharge, 2,99 €", "Get the top-up, €2.99"),
       color: C.success,
     },
   ];
@@ -4531,7 +4531,7 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
                   {o.label}
                 </div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                  <span style={{ fontSize: "22px", fontWeight: 700, color: o.color, fontFamily: FONT_SERIF, lineHeight: 1 }}>
+                  <span style={{ fontSize: "22px", fontWeight: 700, color: o.color, fontFamily: FONT_SERIF, lineHeight: 1, whiteSpace: "nowrap", flexShrink: 0 }}>
                     {o.prix}
                   </span>
                   <span style={{ fontSize: "12px", color: C.textSecondary, fontWeight: 500 }}>
@@ -4913,7 +4913,7 @@ export default function App() {
       return;
     }
     if (credits < CREDITS.REWRITE) {
-      setCvOptError(T(`Il vous faut 1 diagnostic pour la réécriture. Achetez la recharge à 2,99 € (3 dossiers complets).`, `You need 1 diagnostic to rewrite. Buy the top-up at €2.99 (3 complete sets).`));
+      setCvOptError(T("Il vous faut 1 diagnostic pour la réécriture. Achetez la recharge à 2,99 € (3 dossiers complets).", "You need 1 diagnostic to rewrite. Buy the top-up at €2.99 (3 complete sets)."));
       return;
     }
     setLoading(true); setLoadingMsg(T("Réécriture de votre CV", "Rewriting your résumé")); setStep(4);
@@ -5019,7 +5019,7 @@ export default function App() {
   const doLettre = async () => {
     if (loading) return;
     if (credits < CREDITS.LETTRE) {
-      setLettreError(T(`Il vous faut 1 diagnostic pour la lettre. Achetez la recharge à 2,99 €.`, `You need 1 diagnostic for the letter. Buy the top-up at €2.99.`));
+      setLettreError(T("Il vous faut 1 diagnostic pour la lettre. Achetez la recharge à 2,99 €.", "You need 1 diagnostic for the letter. Buy the top-up at €2.99."));
       return;
     }
     setLoading(true); setLoadingMsg(T("Rédaction de votre lettre de motivation", "Writing your cover letter")); setStep(5);
@@ -5593,7 +5593,7 @@ export default function App() {
             <div style={{ display: "flex", gap: "12px", marginTop: "4px", flexWrap: "wrap" }}>
               {paid
                 ? <CopyBtn text={cvVersTexte(cvAffiche)}/>
-                : <LockedBtn label={T("Débloquer la copie dès 2,99 €", "Unlock copying from €2.99")} onUnlock={() => setShowOffres(true)}/>
+                : <LockedBtn label={T("Débloquer la copie dès 2,99 €", "Unlock copying from €2.99")} onUnlock={() => setShowOffres(true)}/>
               }
             </div>
 
@@ -5614,7 +5614,7 @@ export default function App() {
                 </PrimaryBtn>
               ) : (
                 <LockedBtn
-                  label={T("Débloquer le téléchargement dès 2,99 €", "Unlock download from €2.99")}
+                  label={T("Débloquer le téléchargement dès 2,99 €", "Unlock download from €2.99")}
                   onUnlock={() => setShowOffres(true)}
                   fullWidth big
                 />
@@ -5628,7 +5628,7 @@ export default function App() {
             )}
             {!paid && (
               <p style={{ fontSize: "14px", color: C.textSecondary, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
-                {T(<>Votre CV est prêt. Pour le récupérer en PDF ou le copier, une <strong style={{ color: C.accent }}>recharge à 2,99 €</strong> suffit.</>, <>Your résumé is ready. To download it as a PDF or copy it, a <strong style={{ color: C.accent }}>€2.99 top-up</strong> is all you need.</>)}
+                {T(<>Votre CV est prêt. Pour le récupérer en PDF ou le copier, une <strong style={{ color: C.accent }}>recharge à 2,99&nbsp;€</strong> suffit.</>, <>Your résumé is ready. To download it as a PDF or copy it, a <strong style={{ color: C.accent }}>€2.99 top-up</strong> is all you need.</>)}
               </p>
             )}
 
@@ -5718,7 +5718,7 @@ export default function App() {
               <div style={{ display: "flex", gap: "12px", marginTop: "16px", flexWrap: "wrap" }}>
                 {paid
                   ? <CopyBtn text={lettre}/>
-                  : <LockedBtn label={T("Débloquer la copie dès 2,99 €", "Unlock copying from €2.99")} onUnlock={() => setShowOffres(true)}/>
+                  : <LockedBtn label={T("Débloquer la copie dès 2,99 €", "Unlock copying from €2.99")} onUnlock={() => setShowOffres(true)}/>
                 }
               </div>
 
@@ -5729,7 +5729,7 @@ export default function App() {
                   </PrimaryBtn>
                 ) : (
                   <LockedBtn
-                    label={T("Débloquer le téléchargement dès 2,99 €", "Unlock download from €2.99")}
+                    label={T("Débloquer le téléchargement dès 2,99 €", "Unlock download from €2.99")}
                     onUnlock={() => setShowOffres(true)}
                     fullWidth big
                   />
@@ -5743,7 +5743,7 @@ export default function App() {
               )}
               {!paid && (
                 <p style={{ fontSize: "14px", color: C.textSecondary, textAlign: "center", marginTop: "12px", fontFamily: FONT_SANS, lineHeight: 1.6 }}>
-                  {T(<>Votre lettre est prête. Pour la récupérer en PDF ou la copier, <strong style={{ color: C.accent }}>2,99 €</strong> suffit.</>, <>Your letter is ready. To download it as a PDF or copy it, <strong style={{ color: C.accent }}>€2.99</strong> is all you need.</>)}
+                  {T(<>Votre lettre est prête. Pour la récupérer en PDF ou la copier, <strong style={{ color: C.accent }}>2,99&nbsp;€</strong> suffit.</>, <>Your letter is ready. To download it as a PDF or copy it, <strong style={{ color: C.accent }}>€2.99</strong> is all you need.</>)}
                 </p>
               )}
 
@@ -5817,7 +5817,7 @@ export default function App() {
                   <div style={{ position: "absolute", top: "-10px", right: "16px", background: C.success, color: "#FFF", fontSize: "11px", padding: "3px 10px", borderRadius: "10px", fontWeight: 700 }}>
                     {T("★ Meilleure offre", "★ Best value")}
                   </div>
-                  {T("Annuel, 49,99 € (60 dossiers complets)", "Annual, €49.99 (60 complete sets)")}
+                  {T("Annuel, 49,99 € (60 dossiers complets)", "Annual, €49.99 (60 complete sets)")}
                 </div>
               </a>
               <a href={stripeUrl(STRIPE_MENSUEL)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
@@ -5828,7 +5828,7 @@ export default function App() {
                   fontSize: "15px", fontWeight: 600,
                   borderRadius: "12px",
                 }}>
-                  {T("Mensuel, 5,99 € / mois (8 dossiers / mois)", "Monthly, €5.99 / month (8 sets / month)")}
+                  {T("Mensuel, 5,99 € / mois (8 dossiers / mois)", "Monthly, €5.99 / month (8 sets / month)")}
                 </div>
               </a>
               <a href={stripeUrl(STRIPE_RECHARGE)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
@@ -5839,7 +5839,7 @@ export default function App() {
                   fontSize: "14px", fontWeight: 600,
                   borderRadius: "12px",
                 }}>
-                  {T("Recharge ponctuelle, 2,99 € (3 dossiers complets)", "One-time top-up, €2.99 (3 complete sets)")}
+                  {T("Recharge ponctuelle, 2,99 € (3 dossiers complets)", "One-time top-up, €2.99 (3 complete sets)")}
                 </div>
               </a>
             </div>

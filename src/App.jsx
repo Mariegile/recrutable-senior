@@ -79,6 +79,15 @@ function stripeUrl(base) {
   }
   return url;
 }
+// Achat réservé aux comptes connectés : sans client_reference_id, un paiement
+// fait avec un autre e-mail que celui du compte (cas Google) ne peut pas être
+// rattaché au compte et reste non crédité. On ouvre la connexion à la place.
+let DEMANDER_CONNEXION = null; // fourni par App
+function exigerConnexion(e) {
+  if (CURRENT_USER?.id) return;
+  e.preventDefault();
+  DEMANDER_CONNEXION?.();
+}
 const SUPPORT_EMAIL   = "recrutable@proton.me";
 
 // ── Coût en crédits par action ─────────────────────────────────────
@@ -364,7 +373,7 @@ function detectRetourStripe() {
     localStorage.setItem(USED_SESSIONS_KEY, JSON.stringify(used.slice(-100)));
 
     cleanUrl();
-    return paid;
+    return { formule: paid, sessionId };
   } catch {
     return null;
   }
@@ -2295,7 +2304,7 @@ function PaperBG() {
 }
 
 // ── Bannière de bienvenue après paiement Stripe réussi ─────────────
-function PaymentSuccessBanner({ formule, credits, onClose }) {
+function PaymentSuccessBanner({ formule, etat, credits, onClose }) {
   const T = useT();
   // Chiffres tirés de RECHARGE_CREDITS : une seule source de vérité,
   // alignée sur ce que le webhook Stripe crédite réellement.
@@ -2307,10 +2316,12 @@ function PaymentSuccessBanner({ formule, credits, onClose }) {
 
   // Auto-fermeture après 30 secondes (cible senior : laisser le temps de lire)
   // Le hook doit être appelé AVANT tout return conditionnel (règles des hooks React)
+  // Pas d'auto-fermeture tant que le crédit n'est pas confirmé.
   useEffect(() => {
+    if (etat !== "confirme") return;
     const t = setTimeout(onClose, 30000);
     return () => clearTimeout(t);
-  }, [onClose]);
+  }, [onClose, etat]);
 
   if (!config) return null;
 
@@ -2337,10 +2348,16 @@ function PaymentSuccessBanner({ formule, credits, onClose }) {
           {T("Paiement reçu, merci !", "Payment received, thank you!")}
         </div>
         <div style={{ fontSize: "14px", color: C.text, lineHeight: 1.5 }}>
-          {T("Votre ", "Your ")}<strong>{config.label}</strong>{T(" est activé.", " is now active.")}
+          {T("Votre ", "Your ")}<strong>{config.label}</strong>{T(" est enregistré.", " is recorded.")}
           <br/>
-          <strong style={{ color: C.success }}>+{config.ajout} {T("crédits", "credits")}</strong> {T("ajoutés à votre compte", "added to your account")}
-          {" "}({T("total", "total")} : <strong>{credits}</strong> {T("crédits disponibles", "credits available")}).
+          {etat === "confirme" && <>
+            <strong style={{ color: C.success }}>+{config.ajout} {T("crédits", "credits")}</strong> {T("ajoutés à votre compte", "added to your account")}
+            {" "}({T("total", "total")} : <strong>{credits}</strong> {T("crédits disponibles", "credits available")}).
+          </>}
+          {(etat === "attente" || !etat) && T("Ajout de vos crédits en cours, cela prend en général quelques secondes…", "Adding your credits, this usually takes a few seconds…")}
+          {etat === "retard" && T(`Vos crédits n'apparaissent pas encore. Ils sont ajoutés automatiquement dès que Stripe nous confirme le paiement : rechargez la page dans quelques minutes. Si rien après 15 minutes, écrivez à ${SUPPORT_EMAIL}.`,
+                                  `Your credits are not showing yet. They are added automatically as soon as Stripe confirms the payment: reload the page in a few minutes. If nothing after 15 minutes, email ${SUPPORT_EMAIL}.`)}
+          {etat === "connexion" && T("Connectez-vous avec le compte utilisé pour l'achat pour voir vos crédits.", "Log in with the account used for the purchase to see your credits.")}
         </div>
       </div>
       <button
@@ -4288,7 +4305,7 @@ function Footer() {
 }
 
 // ── Modal des offres : ouverte depuis le badge des crédits ─────────
-function AuthModal({ open, onClose }) {
+function AuthModal({ open, onClose, raison }) {
   const T = useT();
   const [mode, setMode] = useState("login");
   const [email, setEmail] = useState("");
@@ -4329,7 +4346,7 @@ function AuthModal({ open, onClose }) {
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(20,22,18,0.55)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: C.bgCard, borderRadius: "18px", padding: "32px 28px", width: "100%", maxWidth: "420px", boxShadow: "0 30px 60px -20px rgba(0,0,0,0.4)", fontFamily: FONT_SANS }}>
         <h2 style={{ margin: "0 0 6px", fontFamily: FONT_SERIF, fontSize: "24px", color: C.primary }}>{mode === "signup" ? T("Créer un compte", "Create an account") : T("Se connecter", "Log in")}</h2>
-        <p style={{ margin: "0 0 20px", fontSize: "14px", color: C.textSecondary }}>{T("Vos crédits sont liés à votre compte.", "Your credits are tied to your account.")}</p>
+        <p style={{ margin: "0 0 20px", fontSize: "14px", color: C.textSecondary }}>{raison || T("Vos crédits sont liés à votre compte.", "Your credits are tied to your account.")}</p>
         <button onClick={googleLogin} style={{ width: "100%", padding: "12px", background: "#FFF", color: C.text, border: `1.5px solid ${C.border}`, borderRadius: "10px", fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer", marginBottom: "14px" }}>{T("Continuer avec Google", "Continue with Google")}</button>
         <div style={{ textAlign: "center", fontSize: "12px", color: C.textMuted, margin: "0 0 14px" }}>{T("- ou -", "- or -")}</div>
         <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder={T("Votre e-mail", "Your email")} style={{ width: "100%", padding: "12px 14px", border: `1.5px solid ${C.inputBorder}`, borderRadius: "10px", fontSize: "15px", fontFamily: FONT_SANS, marginBottom: "10px", boxSizing: "border-box" }} />
@@ -4510,7 +4527,7 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
                 ))}
               </div>
 
-              <a href={o.href} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+              <a href={o.href} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
                 <div style={{
                   minHeight: "52px",
                   padding: "14px 18px",
@@ -4617,6 +4634,7 @@ export default function App() {
   const [pivotError, setPivotError]         = useState("");
   const [showPivot, setShowPivot]           = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(null);
+  const [paiementEtat, setPaiementEtat] = useState(null); // attente | confirme | retard | connexion
   // Hero d'accueil : visible tant que le parcours n'a pas vraiment commencé
   // (aucune session, ou session restée à l'étape 1 sans analyse ni réécriture).
   // Un simple texte collé sans analyse ne suffit pas à le masquer.
@@ -4661,12 +4679,37 @@ export default function App() {
 
   // ── Au chargement : détecte le retour de paiement Stripe ──────────
   useEffect(() => {
-    const formule = detectRetourStripe();
-    if (formule) {
-      setPaymentSuccess(formule);
-      // Credits ajoutes cote serveur par le webhook Stripe ; on rafraichit depuis la base.
-      supabase.auth.getSession().then(({ data }) => chargerCredits(data.session));
-    }
+    const retour = detectRetourStripe();
+    if (!retour) return;
+    setPaymentSuccess(retour.formule);
+    setPaiementEtat("attente");
+    // Le webhook Stripe crédite côté serveur, parfois avec quelques secondes
+    // (ou minutes) de décalage : on attend la transaction de CETTE session
+    // (transactions.details = id de session, lisible par son propriétaire)
+    // au lieu de lire le solde une seule fois, trop tôt.
+    let annule = false;
+    (async () => {
+      for (let i = 0; i < 40 && !annule; i++) {          // ~2 minutes
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) { setPaiementEtat("connexion"); return; }
+        const { data: tx } = await supabase.from("transactions").select("id").eq("details", retour.sessionId).limit(1);
+        if (tx && tx.length) { await chargerCredits(data.session); setPaiementEtat("confirme"); return; }
+        await new Promise(r => setTimeout(r, 3000));
+      }
+      if (!annule) setPaiementEtat("retard");
+    })();
+    return () => { annule = true; };
+  }, []);
+
+  // Retour sur l'onglet (le paiement Stripe s'ouvre dans un nouvel onglet) :
+  // on relit le solde pour ne pas afficher un compteur périmé.
+  useEffect(() => {
+    const relire = () => {
+      if (document.visibilityState === "visible") supabase.auth.getSession().then(({ data }) => chargerCredits(data.session));
+    };
+    document.addEventListener("visibilitychange", relire);
+    window.addEventListener("focus", relire);
+    return () => { document.removeEventListener("visibilitychange", relire); window.removeEventListener("focus", relire); };
   }, []);
 
   // ── Au chargement : code cadeau passe en lien (?code=XXX) ─────────
@@ -4701,6 +4744,24 @@ export default function App() {
   // ── Connexion / session (Supabase) ───────────────────────────────
   const [session, setSession] = useState(null);
   const [showAuth, setShowAuth] = useState(false);
+  // Achat demandé sans être connecté : connexion d'abord, puis retour aux offres.
+  const [achatEnAttente, setAchatEnAttente] = useState(false);
+  useEffect(() => {
+    DEMANDER_CONNEXION = () => {
+      setShowOffres(false); setAchatEnAttente(true); setShowAuth(true);
+      // survit à la redirection de la connexion Google
+      try { sessionStorage.setItem("achat_apres_connexion", "1"); } catch { /* stockage indisponible */ }
+    };
+    return () => { DEMANDER_CONNEXION = null; };
+  }, []);
+  useEffect(() => {
+    let apresGoogle = false;
+    try { apresGoogle = sessionStorage.getItem("achat_apres_connexion") === "1"; } catch { /* stockage indisponible */ }
+    if (session && (achatEnAttente || apresGoogle)) {
+      try { sessionStorage.removeItem("achat_apres_connexion"); } catch { /* stockage indisponible */ }
+      setAchatEnAttente(false); setShowAuth(false); setShowOffres(true);
+    }
+  }, [session, achatEnAttente]);
   // Charge les credits du compte depuis la base (0 si deconnecte)
   const chargerCredits = async (s) => {
     if (!s) { setCredits(0); return; }
@@ -5074,11 +5135,13 @@ export default function App() {
       <PaperBG/>
 
       <Header credits={credits} onCreditsClick={() => setShowOffres(true)} session={session} onLogin={() => setShowAuth(true)} onLogout={() => supabase.auth.signOut()}/>
-      <AuthModal open={showAuth} onClose={() => setShowAuth(false)}/>
+      <AuthModal open={showAuth} onClose={() => { setShowAuth(false); setAchatEnAttente(false); }}
+        raison={achatEnAttente ? T("Connectez-vous ou créez votre compte avant de payer : vos crédits seront ajoutés à ce compte.", "Log in or create your account before paying: your credits will be added to this account.") : null}/>
 
       {paymentSuccess && (
         <PaymentSuccessBanner
           formule={paymentSuccess}
+          etat={paiementEtat}
           credits={credits}
           onClose={() => setPaymentSuccess(null)}
         />
@@ -5719,7 +5782,7 @@ export default function App() {
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "420px", margin: "0 auto" }}>
-              <a href={stripeUrl(STRIPE_ANNUEL)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+              <a href={stripeUrl(STRIPE_ANNUEL)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
                 <div style={{
                   padding: "16px 20px",
                   background: C.accent, color: "#FFF",
@@ -5733,7 +5796,7 @@ export default function App() {
                   {T("Annuel, 49,99 € (60 dossiers complets)", "Annual, €49.99 (60 complete sets)")}
                 </div>
               </a>
-              <a href={stripeUrl(STRIPE_MENSUEL)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+              <a href={stripeUrl(STRIPE_MENSUEL)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
                 <div style={{
                   padding: "14px 20px",
                   background: C.bgCard, color: C.primary,
@@ -5744,7 +5807,7 @@ export default function App() {
                   {T("Mensuel, 5,99 € / mois (8 dossiers / mois)", "Monthly, €5.99 / month (8 sets / month)")}
                 </div>
               </a>
-              <a href={stripeUrl(STRIPE_RECHARGE)} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+              <a href={stripeUrl(STRIPE_RECHARGE)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
                 <div style={{
                   padding: "14px 20px",
                   background: C.bgCard, color: C.textSecondary,

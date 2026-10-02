@@ -8,7 +8,8 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "verifier-cv": "node --test scripts/verifier-cv.mjs"
+    "verifier-cv": "node --test scripts/verifier-cv.mjs",
+    "tester-webhook": "node --test scripts/tester-webhook.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",

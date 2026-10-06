@@ -9,7 +9,7 @@ import { PGlite } from "@electric-sql/pglite";
 const MIGRATION = fs.readFileSync(new URL("../supabase/migrations/20261006_credits_codes_expirants.sql", import.meta.url), "utf8");
 
 const SCHEMA_PROD = `
-create role anon; create role authenticated;
+create role anon; create role authenticated; create role service_role;
 create schema auth;
 create table auth.users (id uuid primary key);
 create table public.profils (id uuid primary key references auth.users(id), email text, credits integer default 0, created_at timestamptz default now(), stripe_customer_id text);
@@ -122,8 +122,16 @@ test("deux codes : le lot qui expire le plus tôt est consommé en premier", asy
   assert.deepEqual((await lots(db, a)).map(l => l.restant), [0, 4]);
 });
 
-test("aucune des fonctions n'est exécutable par anon / authenticated", async () => {
+test("aucune des fonctions n'est exécutable par anon / authenticated ; service_role garde ses droits", async () => {
   const db = await base();
+  // Cas défavorable : le droit de service_role ne venait que du rôle PUBLIC.
+  for (const f of ["public.expirer_credits()", "public.utiliser_code_cadeau(uuid, text)"]) {
+    const p = (await db.query(`select has_function_privilege('service_role', '${f}', 'execute') as p`)).rows[0].p;
+    assert.equal(p, true, `service_role doit exécuter ${f}`);
+  }
+  for (const [t, d] of [["public.credits_expirants", "insert"], ["public.credits_expirants", "update"]]) {
+    assert.equal((await db.query(`select has_table_privilege('service_role', '${t}', '${d}') as p`)).rows[0].p, true);
+  }
   for (const f of ["public.expirer_credits()", "public.consommer_credits_expirants()", "public.utiliser_code_cadeau(uuid, text)"]) {
     for (const role of ["anon", "authenticated"]) {
       const r = (await db.query(`select has_function_privilege('${role}', '${f}', 'execute') as p`)).rows[0].p;

@@ -13,6 +13,9 @@
 --   4. expirer_credits() (appelée chaque jour par la fonction Netlify
 --      keepalive-supabase) : retire du solde ce qui reste des lots échus.
 
+-- Tout ou rien : en cas d'erreur, rien n'est modifié.
+begin;
+
 alter table public.codes_cadeau
   add column if not exists validite_credits interval;
 
@@ -158,3 +161,11 @@ end $$;
 revoke execute on function public.consommer_credits_expirants() from public, anon, authenticated;
 revoke execute on function public.expirer_credits() from public, anon, authenticated;
 revoke execute on function public.utiliser_code_cadeau(uuid, text) from public, anon, authenticated;
+
+-- Les fonctions Netlify (rôle service_role) doivent pouvoir les appeler,
+-- même si leur droit venait jusqu'ici du rôle PUBLIC.
+grant execute on function public.expirer_credits() to service_role;
+grant execute on function public.utiliser_code_cadeau(uuid, text) to service_role;
+grant select, insert, update on table public.credits_expirants to service_role;
+
+commit;

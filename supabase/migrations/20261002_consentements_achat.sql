@@ -17,3 +17,6 @@ create index if not exists consentements_achat_user_idx
 -- Aucun accès depuis le navigateur : RLS activée sans politique.
 alter table public.consentements_achat enable row level security;
 revoke all on table public.consentements_achat from anon, authenticated;
+
+-- Écriture par la fonction Netlify « consentement » (rôle service_role).
+grant select, insert on table public.consentements_achat to service_role;

@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "verifier-cv": "node --test scripts/verifier-cv.mjs",
     "tester-webhook": "node --test scripts/tester-webhook.mjs",
-    "tester-conformite": "node --test scripts/tester-conformite.mjs"
+    "tester-conformite": "node --test scripts/tester-conformite.mjs",
+    "tester-codes": "node --test scripts/tester-codes-cadeaux.mjs"
   },
   "dependencies": {
     "@fontsource-variable/dm-sans": "^5.3.0",
@@ -22,6 +23,7 @@
     "stripe": "^22.2.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@eslint/js": "^10.0.1",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

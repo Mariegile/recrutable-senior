@@ -320,8 +320,17 @@ async function utiliserCodeCadeau(rawCode) {
     });
     const r = await res.json().catch(() => ({}));
     if (!res.ok || !r.ok) return { ok: false, raison: r.raison || "erreur" };
-    return { ok: true, credits: r.credits, total: r.total };
+    return { ok: true, credits: r.credits, total: r.total, expireLe: r.expire_le || null };
   } catch { return { ok: false, raison: "erreur" }; }
+}
+
+// Crédits offerts à durée limitée (codes partenaires) : « valables jusqu'au … »
+function mentionValidite(r) {
+  if (!r?.expireLe) return "";
+  const d = new Date(r.expireLe);
+  if (isNaN(d)) return "";
+  const date = d.toLocaleDateString(CURRENT_LANG === "en" ? "en-GB" : "fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  return tg(` Ces crédits offerts sont valables jusqu'au ${date}.`, ` These free credits are valid until ${date}.`);
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -4701,7 +4710,7 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
           <div style={{ fontSize: "14px", fontWeight: 600, color: C.text, marginBottom: "8px", textAlign: "center" }}>{T("Vous avez un code cadeau ?", "Have a gift code?")}</div>
           <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
             <input value={codeInput} onChange={(e) => setCodeInput(e.target.value)} placeholder={T("Entrez votre code", "Enter your code")} style={{ flex: 1, minWidth: "180px", padding: "10px 14px", border: `1.5px solid ${C.inputBorder}`, borderRadius: "10px", fontSize: "15px", fontFamily: FONT_SANS, textTransform: "uppercase" }} />
-            <button onClick={async () => { setCodeMsg(null); const r = await onRedeem(codeInput); if (r.ok) { setCodeMsg({ ok: true, text: T(r.credits + " crédits ajoutés ! Vous avez maintenant " + r.total + " crédits.", r.credits + " credits added! You now have " + r.total + " credits.") }); setCodeInput(""); } else if (r.raison === "deja") { setCodeMsg({ ok: false, text: T("Ce code a déjà été utilisé.", "This code has already been used.") }); } else if (r.raison === "connexion") { setCodeMsg({ ok: false, text: T("Connectez-vous pour utiliser un code cadeau.", "Log in to use a gift code.") }); } else if (r.raison === "expire") { setCodeMsg({ ok: false, text: T("Ce code a expiré.", "This code has expired.") }); } else if (r.raison === "epuise") { setCodeMsg({ ok: false, text: T("Ce code n'est plus disponible.", "This code is no longer available.") }); } else { setCodeMsg({ ok: false, text: T("Code invalide.", "Invalid code.") }); } }} style={{ padding: "10px 18px", background: C.primary, color: "#FFF", border: "none", borderRadius: "10px", fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>{T("Valider", "Apply")}</button>
+            <button onClick={async () => { setCodeMsg(null); const r = await onRedeem(codeInput); if (r.ok) { setCodeMsg({ ok: true, text: T(r.credits + " crédits ajoutés ! Vous avez maintenant " + r.total + " crédits.", r.credits + " credits added! You now have " + r.total + " credits.") + mentionValidite(r) }); setCodeInput(""); } else if (r.raison === "deja") { setCodeMsg({ ok: false, text: T("Ce code a déjà été utilisé.", "This code has already been used.") }); } else if (r.raison === "connexion") { setCodeMsg({ ok: false, text: T("Connectez-vous pour utiliser un code cadeau.", "Log in to use a gift code.") }); } else if (r.raison === "expire") { setCodeMsg({ ok: false, text: T("Ce code a expiré.", "This code has expired.") }); } else if (r.raison === "epuise") { setCodeMsg({ ok: false, text: T("Ce code n'est plus disponible.", "This code is no longer available.") }); } else { setCodeMsg({ ok: false, text: T("Code invalide.", "Invalid code.") }); } }} style={{ padding: "10px 18px", background: C.primary, color: "#FFF", border: "none", borderRadius: "10px", fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>{T("Valider", "Apply")}</button>
           </div>
           {codeMsg && (<div style={{ marginTop: "8px", fontSize: "13px", textAlign: "center", fontWeight: 600, color: codeMsg.ok ? C.success : C.error }}>{codeMsg.text}</div>)}
         </div>
@@ -4856,7 +4865,7 @@ export default function App() {
       if (annule) return true;
       if (r.ok) {
         setCredits(r.total);
-        setTimeout(() => alert(T("Code cadeau validé ! " + r.credits + " crédits ont été ajoutés à votre compte.", "Gift code applied! " + r.credits + " credits have been added to your account.")), 300);
+        setTimeout(() => alert(T("Code cadeau validé ! " + r.credits + " crédits ont été ajoutés à votre compte." + mentionValidite(r), "Gift code applied! " + r.credits + " credits have been added to your account." + mentionValidite(r))), 300);
         return true;
       }
       return r.raison !== "connexion"; // seul le cas "pas connecté" mérite un retry

@@ -100,7 +100,9 @@ const CGV = {
         ] },
         "1 crédit = 1 dossier complet pour une offre : réécriture du CV, puis lettre de motivation, traduction et pistes de reconversion associées, téléchargement et copie.",
         "Pour garantir le service à tous, des limites d'usage quotidiennes s'appliquent (par exemple 30 réécritures par jour et par compte).",
-        "Validité des crédits : [À COMPLÉTER : durée de validité des crédits achetés et sort des crédits non utilisés à la fin d'un abonnement].",
+        "Validité des crédits : les crédits achetés (recharge ou abonnement) n'expirent pas ; ils restent utilisables après la fin d'un abonnement.",
+        "Crédits offerts par un code partenaire : ils sont valables pendant la durée indiquée avec le code (par exemple 3 mois à compter de son utilisation) et sont utilisés en priorité. À l'échéance, les crédits offerts non utilisés sont retirés du compte. Un code ne peut être utilisé qu'une fois par compte.",
+        "Les crédits non utilisés ne sont pas remboursés, sauf échec technique (voir l'article 6) ou obligation légale, notamment le droit de rétractation tant qu'aucun crédit acheté n'a été utilisé (article 5).",
       ] },
       { h: "4. Commande et paiement", p: [
         "Le paiement est effectué par carte bancaire via Stripe (Stripe Payments Europe Ltd). Recrutable n'a jamais accès à vos numéros de carte.",
@@ -124,7 +126,7 @@ const CGV = {
       ] },
       { h: "8. Réclamations et médiation", p: [
         `Pour toute réclamation : ${EMAIL}. Nous répondons sous 7 jours ouvrés [À COMPLÉTER : délai].`,
-        "En cas de litige non résolu, vous pouvez recourir gratuitement au médiateur de la consommation : [À COMPLÉTER : nom, adresse et site du médiateur].",
+        "En cas de litige non résolu après réclamation écrite auprès de nous, vous pouvez recourir gratuitement au médiateur de la consommation : [À COMPLÉTER : nom, adresse postale et site du médiateur après adhésion].",
       ] },
       { h: "9. Droit applicable", p: [
         "Les présentes conditions sont soumises au droit français. À défaut d'accord amiable, le litige relève des tribunaux compétents, le consommateur pouvant saisir la juridiction du lieu où il demeurait au moment de la commande.",
@@ -151,7 +153,9 @@ const CGV = {
         ] },
         "1 credit = 1 complete set for one job: résumé rewrite, then the related cover letter, translation and career-change ideas, download and copy.",
         "Daily usage limits apply (for example 30 rewrites per day per account).",
-        "Credit validity: [TO COMPLETE].",
+        "Credit validity: purchased credits (top-up or subscription) do not expire and remain usable after a subscription ends.",
+        "Credits from a partner code are valid for the period stated with the code (for example 3 months from its use) and are used first. Unused free credits are removed when they expire. A code can be used once per account.",
+        "Unused credits are not refunded, except in case of technical failure (article 6) or legal obligation, notably the right of withdrawal while no purchased credit has been used (article 5).",
       ] },
       { h: "4. Order and payment", p: [
         "Payment is made by card through Stripe. Recrutable never sees your card numbers.",
@@ -191,7 +195,7 @@ const CONFIDENTIALITE = {
         { liste: [
           "Compte : adresse e-mail, identifiant technique, mot de passe (stocké sous forme chiffrée par Supabase) ou, en cas de connexion Google, les informations transmises par Google (e-mail, nom, photo de profil).",
           "Consentement avant paiement : date et heure, offre choisie, version du texte accepté (CGV et renonciation au droit de rétractation).",
-          "Crédits et paiements : solde de crédits, historique des mouvements (date, nombre de crédits, référence de la session de paiement Stripe), identifiant client Stripe. Les données de carte bancaire sont traitées uniquement par Stripe.",
+          "Crédits et paiements : solde de crédits, date d'échéance des crédits offerts par un code partenaire, historique des mouvements (date, nombre de crédits, référence de la session de paiement Stripe), identifiant client Stripe. Les données de carte bancaire sont traitées uniquement par Stripe.",
           "CV et offres d'emploi : l'analyse gratuite est réalisée dans votre navigateur, sans envoi à nos serveurs. Pour la réécriture, la lettre, la traduction et les pistes de reconversion, le texte du CV et de l'offre est envoyé à nos fonctions serveur puis au service d'intelligence artificielle d'Anthropic, le temps du traitement. Nous ne conservons pas vos CV ni vos offres sur nos serveurs.",
           "Données d'utilisation : nombre d'utilisations par jour et par action (limites anti-abus), adresse IP utilisée temporairement pour limiter le nombre de requêtes, journaux techniques de l'hébergeur.",
         ] },
@@ -254,7 +258,7 @@ const CONFIDENTIALITE = {
       { h: "Data processed", p: [
         { liste: [
           "Account: email address, technical ID, password (stored encrypted by Supabase) or, with Google sign-in, the data provided by Google (email, name, profile picture).",
-          "Credits and payments: credit balance, movement history (date, credits, Stripe session reference), Stripe customer ID. Card data is handled by Stripe only.",
+          "Credits and payments: credit balance, expiry date of partner-code credits, movement history (date, credits, Stripe session reference), Stripe customer ID. Card data is handled by Stripe only.",
           "Résumés and job postings: the free analysis runs in your browser. For the rewrite, letter, translation and career-change ideas, the text is sent to our server functions and then to Anthropic's AI service for processing. We do not store your résumés or postings on our servers.",
           "Usage data: daily usage counts per action, IP address used temporarily for rate limiting, host technical logs.",
         ] },

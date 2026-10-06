@@ -4,6 +4,9 @@
 //  pause après ~7 jours sans activité).
 //
 //  - Ne renvoie aucune donnée (comptage "head", aucune ligne lue).
+//  - Profite du passage quotidien pour retirer les crédits offerts par
+//    code partenaire arrivés à échéance (RPC expirer_credits). Si la
+//    migration n'est pas encore appliquée : simple avertissement.
 //  - Une fonction planifiée n'est pas appelable publiquement en production.
 //  - Si la configuration manque ou si Supabase répond mal : simple
 //    avertissement dans les logs, réponse 200, jamais de plantage.
@@ -26,11 +29,15 @@ function creerHandler(fabriqueClient) {
       return { statusCode: 200, body: "ignoré" };
     }
     try {
-      const erreur = await ping(fabriqueClient(url, cle));
+      const client = fabriqueClient(url, cle);
+      const erreur = await ping(client);
       if (erreur) {
         console.warn("keepalive-supabase: réponse en erreur:", erreur);
         return { statusCode: 200, body: "erreur" };
       }
+      const exp = await client.rpc("expirer_credits");
+      if (exp.error) console.warn("keepalive-supabase: expiration des crédits impossible:", exp.error.message);
+      else if (exp.data) console.log("keepalive-supabase: crédits expirés retirés:", exp.data);
       console.log("keepalive-supabase: ok");
       return { statusCode: 200, body: "ok" };
     } catch (err) {

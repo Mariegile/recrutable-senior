@@ -14,6 +14,7 @@ create schema auth;
 create table auth.users (id uuid primary key);
 create table public.profils (id uuid primary key references auth.users(id), email text, credits integer default 0, created_at timestamptz default now(), stripe_customer_id text);
 create table public.transactions (id bigint generated always as identity primary key, user_id uuid, montant integer, type text, details text, created_at timestamptz default now());
+create unique index transactions_details_unique on public.transactions (details);
 create table public.codes_cadeau (code text primary key, credits integer, actif boolean default true, max_utilisations integer, utilisations integer default 0, expire_le timestamptz, note text, created_at timestamptz default now());
 create table public.codes_cadeau_usages (code text, user_id uuid, used_at timestamptz default now(), primary key (code, user_id));
 `;
@@ -97,9 +98,31 @@ test("les dépenses consomment d'abord les crédits offerts ; à l'échéance se
   assert.equal(await expirer(db), 3);
   assert.equal(await solde(db, a), 3 + 8);     // crédits achetés intacts
   const tx = (await db.query("select montant, type, details from public.transactions where user_id = $1 and montant < 0", [a])).rows;
-  assert.deepEqual(tx, [{ montant: -3, type: "code_cadeau", details: "expiration:FORCEFEMMES" }]);
+  assert.equal(tx.length, 1);
+  assert.equal(tx[0].montant, -3);
+  assert.equal(tx[0].type, "code_cadeau");
+  assert.match(tx[0].details, new RegExp(`^expiration:FORCEFEMMES:${a}:\\d+$`));
   assert.equal(await expirer(db), 0);           // idempotent
   assert.equal(await solde(db, a), 11);
+});
+
+test("même code pour 2 comptes : l'expiration passe pour les deux (details UNIQUE)", async () => {
+  const db = await base(); await db.exec(CODE_ASSO);
+  const a = await compte(db, 1);
+  const b = await compte(db, 0);
+  await utiliser(db, a, "FORCEFEMMES");
+  await utiliser(db, b, "FORCEFEMMES");
+  await depenser(db, b, 1);
+  await vieillir(db, a); await vieillir(db, b);
+  assert.equal(await expirer(db), 5 + 4);
+  assert.equal(await solde(db, a), 1);
+  assert.equal(await solde(db, b), 0);
+  const tx = (await db.query("select user_id, details from public.transactions where montant < 0 order by id")).rows;
+  assert.equal(tx.length, 2);
+  assert.notEqual(tx[0].details, tx[1].details);
+  assert.deepEqual(tx.map(t => t.user_id).sort(), [a, b].sort());
+  assert.deepEqual((await lots(db, a)).map(l => l.restant), [0]);
+  assert.deepEqual((await lots(db, b)).map(l => l.restant), [0]);
 });
 
 test("crédits offerts entièrement utilisés avant l'échéance : rien n'est retiré", async () => {

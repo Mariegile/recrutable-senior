@@ -82,9 +82,10 @@ begin
        set credits = greatest(credits - lot.restant, 0)
      where id = lot.user_id;
     retire := lot.restant;
-    -- Type existant (« code_cadeau ») pour respecter d'éventuelles contraintes.
+    -- Type existant (« code_cadeau ») pour respecter d'éventuelles contraintes ;
+    -- details est UNIQUE en base : on y inclut le compte et le lot.
     insert into public.transactions (user_id, montant, type, details)
-         values (lot.user_id, -retire, 'code_cadeau', 'expiration:' || lot.origine);
+         values (lot.user_id, -retire, 'code_cadeau', 'expiration:' || lot.origine || ':' || lot.user_id::text || ':' || lot.id::text);
     update public.credits_expirants set restant = 0 where id = lot.id;
     total := total + retire;
   end loop;

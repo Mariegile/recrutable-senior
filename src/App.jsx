@@ -2598,7 +2598,7 @@ function HirableAccueil({ onStart }) {
     </ul>
   );
   return (
-    <section aria-labelledby="hirable-titre" style={{ fontFamily: FONT_SANS, marginBottom: "28px", overflowWrap: "anywhere" }}>
+    <section aria-labelledby="hirable-titre" style={{ fontFamily: FONT_SANS, marginBottom: "28px", overflowWrap: "anywhere", textAlign: "left" }}>
       <div style={{
         display: "inline-flex", background: C.accentSoft, border: `1px solid ${C.accent}40`, color: C.accentDark,
         borderRadius: "999px", padding: "7px 14px", fontSize: "13.5px", fontWeight: 700, marginBottom: "16px",
@@ -5392,7 +5392,8 @@ export default function App() {
 
       <div className={`app-main-container${step === 1 && (montrerHero || PAGE_EN) ? " accueil-mode" : ""}`} style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>
 
-        <div className="app-rail"><StepBar current={step}/></div>
+        {/* Accueil /en : l'accroche passe avant la barre d'étapes */}
+        {!(PAGE_EN && step === 1) && <div className="app-rail"><StepBar current={step}/></div>}
         <div className="app-stage">
 
         {/* HERO D'ACCUEIL, première visite uniquement.

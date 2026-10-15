@@ -113,8 +113,15 @@ export function separerTheme(ligne) {
   return {
     theme: s.slice(0, i).trim(),
     // virgules hors parenthèses : « Cuisine (entrées, plats), Liaison froide »
-    elements: s.slice(i + 3).split(/\s*,\s*(?![^()]*\))/).map(x => x.trim()).filter(Boolean),
+    elements: s.slice(i + 3).split(/\s*,\s*(?![^()]*\))/).map(x => majusculeInitiale(x.trim())).filter(Boolean),
   };
+}
+
+// Chaque compétence affichée en puce commence par une majuscule
+// (« outil de réservation OpenTable » -> « Outil de réservation OpenTable »),
+// sans toucher aux noms du type « iOS » ou « eBay » (2e lettre majuscule).
+function majusculeInitiale(x) {
+  return /^[a-zà-öø-ÿ][a-zà-öø-ÿ]/.test(x) ? x.charAt(0).toLocaleUpperCase("fr-FR") + x.slice(1) : x;
 }
 
 // Accepte ["a", "b"] OU [{ theme, elements: [] }] et renvoie des lignes

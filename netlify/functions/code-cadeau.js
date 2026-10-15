@@ -72,5 +72,5 @@ exports.handler = async (event) => {
   // data = { ok, raison, credits, total }
   if (!data || !data.ok) return reponse(200, { ok: false, raison: (data && data.raison) || "inconnu" });
 
-  return reponse(200, { ok: true, credits: data.credits, total: data.total });
+  return reponse(200, { ok: true, credits: data.credits, total: data.total, expire_le: data.expire_le || null });
 };

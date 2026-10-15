@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, createContext, useContext } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { HIRABLE } from "./contenuHirable.js";
 import { restaurerAccents, nettoyerTiretsCv, aplatirCompetences, preparerQuestions } from "./cvTexte.js";
 import { genererCvHtmlFr } from "./cvModele.js";
 
@@ -25,9 +26,27 @@ let CURRENT_LANG = "fr";
 // Traducteur global (hors React), même logique que le hook useT.
 function tg(fr, en) { return CURRENT_LANG === "en" && en !== undefined ? en : fr; }
 
+// Page d'atterrissage anglaise (Hirable) : /en, ouvre l'app en anglais.
+const CHEMIN_EN = "/en";
+function surPageAnglaise() {
+  try { return window.location.pathname.replace(/\/+$/, "") === CHEMIN_EN; } catch { return false; }
+}
+
+const PAGE_EN = surPageAnglaise();
+
 function detectLang() {
   try {
-    // Seul un choix explicite (onglet FR/EN, mémorisé) fait passer en anglais.
+    // Choix explicite à l'arrivée : ?lang=en / ?lang=fr (campagnes) ou page
+    // /en. Il est mémorisé exactement comme un clic sur l'onglet FR/EN.
+    // Les autres paramètres (?src=, ?code=) ne sont pas touchés.
+    const demande = new URLSearchParams(window.location.search).get("lang");
+    const force = demande === "en" || demande === "fr" ? demande : (surPageAnglaise() ? "en" : null);
+    if (force) {
+      try { localStorage.setItem(LANG_KEY, force); } catch { /* stockage indisponible */ }
+      CURRENT_LANG = force;
+      return force;
+    }
+    // Sinon, seul un choix explicite (onglet FR/EN, mémorisé) fait passer en anglais.
     // Par défaut : français, quelle que soit la langue du navigateur. Cela évite
     // notamment que les robots des moteurs (navigateur en anglais) indexent la
     // version anglaise d'un site destiné au marché français.
@@ -133,7 +152,7 @@ const C = {
   // Texte (contraste maximal pour lisibilité senior)
   text:          "#1A1612", // presque noir, chaud
   textSecondary: "#4A4138", // lecture secondaire
-  textMuted:     "#7A6F60", // labels, hints
+  textMuted:     "#6B6052", // labels, hints (4,9:1 minimum sur tous les fonds : WCAG AA)
 
   // Primaire, bleu marine profond (institutionnel, confiance)
   primary:      "#1B3A5C",
@@ -273,6 +292,39 @@ function ajouterCredits(n) {
 // dans la table `codes_cadeau` (Supabase) ; la fonction Netlify vérifie
 // le compte, l'expiration, le quota et crédite atomiquement.
 // Pour créer un code : INSERT dans la table (voir supabase-codes-cadeau.sql).
+// Preuve du consentement (CGV + renonciation au droit de rétractation),
+// horodatée côté serveur. Envoi non bloquant : le paiement s'ouvre aussitôt.
+async function enregistrerConsentement(offre) {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const jwt = data?.session?.access_token;
+    if (!jwt) return;
+    await fetch("/.netlify/functions/consentement", {
+      method: "POST", keepalive: true,
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
+      body: JSON.stringify({ offre, cgv: true, renonciation: true, lang: CURRENT_LANG }),
+    });
+  } catch { /* le journal serveur reste la seule trace en cas d'échec réseau */ }
+}
+
+// Résiliation / gestion de l'abonnement : session du portail client Stripe.
+async function ouvrirPortailClient() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const jwt = data?.session?.access_token;
+    if (!jwt) return { ok: false, raison: "connexion" };
+    const res = await fetch("/.netlify/functions/portail-client", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${jwt}` },
+      body: JSON.stringify({ lang: CURRENT_LANG }),
+    });
+    const r = await res.json().catch(() => ({}));
+    return r.ok && r.url ? { ok: true, url: r.url } : { ok: false, raison: r.raison || "erreur" };
+  } catch {
+    return { ok: false, raison: "erreur" };
+  }
+}
+
 async function utiliserCodeCadeau(rawCode) {
   try {
     const code = String(rawCode || "").trim().toUpperCase();
@@ -287,8 +339,17 @@ async function utiliserCodeCadeau(rawCode) {
     });
     const r = await res.json().catch(() => ({}));
     if (!res.ok || !r.ok) return { ok: false, raison: r.raison || "erreur" };
-    return { ok: true, credits: r.credits, total: r.total };
+    return { ok: true, credits: r.credits, total: r.total, expireLe: r.expire_le || null };
   } catch { return { ok: false, raison: "erreur" }; }
+}
+
+// Crédits offerts à durée limitée (codes partenaires) : « valables jusqu'au … »
+function mentionValidite(r) {
+  if (!r?.expireLe) return "";
+  const d = new Date(r.expireLe);
+  if (isNaN(d)) return "";
+  const date = d.toLocaleDateString(CURRENT_LANG === "en" ? "en-GB" : "fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  return tg(` Ces crédits offerts sont valables jusqu'au ${date}.`, ` These free credits are valid until ${date}.`);
 }
 
 // ═════════════════════════════════════════════════════════════════
@@ -2005,7 +2066,6 @@ p{margin-bottom:11px}
 // ═══════════════════════════════════════════════════════════════════
 
 const GLOBAL_STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap');
 
   * { box-sizing: border-box; }
   html, body {
@@ -2017,7 +2077,7 @@ const GLOBAL_STYLES = `
   }
 
   body {
-    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'DM Sans Variable', 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -2301,8 +2361,8 @@ const GLOBAL_STYLES = `
   }
 `;
 
-const FONT_SERIF = "'Fraunces', Georgia, 'Times New Roman', serif";
-const FONT_SANS  = "'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+const FONT_SERIF = "'Fraunces Variable', 'Fraunces', Georgia, 'Times New Roman', serif";
+const FONT_SANS  = "'DM Sans Variable', 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 
 // ═══════════════════════════════════════════════════════════════════
 //   COMPOSANTS UI
@@ -2522,6 +2582,72 @@ function HeroOverlayMobile({ onClose }) {
 // ── Accueil : bloc de bienvenue, affiché uniquement à la première visite ──
 // Objectif : donner envie dès l'arrivée (promesse, preuve visuelle, 3 étapes)
 // avant de présenter le formulaire de l'étape 1.
+// ── Page /en (Hirable) : CV anglais -> CV français, en-tête dédié ──
+// Texte dans contenuHirable.js (partagé avec le HTML statique du build).
+function HirableAccueil({ onStart }) {
+  const h = HIRABLE;
+  const carte = { background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "18px 18px" };
+  const grille = (min) => ({ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${min}px), 1fr))`, gap: "12px" });
+  const liste = (items, signe, couleur) => (
+    <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+      {items.map((x) => (
+        <li key={x} style={{ display: "flex", gap: "10px", alignItems: "flex-start", fontSize: "15.5px", lineHeight: 1.55, color: C.textSecondary }}>
+          <span aria-hidden="true" style={{ color: couleur, fontWeight: 700, flexShrink: 0 }}>{signe}</span><span>{x}</span>
+        </li>
+      ))}
+    </ul>
+  );
+  return (
+    <section aria-labelledby="hirable-titre" style={{ fontFamily: FONT_SANS, marginBottom: "28px", overflowWrap: "anywhere", textAlign: "left" }}>
+      <div style={{
+        display: "inline-flex", background: C.accentSoft, border: `1px solid ${C.accent}40`, color: C.accentDark,
+        borderRadius: "999px", padding: "7px 14px", fontSize: "13.5px", fontWeight: 700, marginBottom: "16px",
+      }}>{h.surtitre}</div>
+      <h1 id="hirable-titre" className="hero-title" style={{ margin: 0, fontFamily: FONT_SERIF, fontWeight: 700, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.12 }}>
+        {h.titre}
+      </h1>
+      <p style={{ margin: "16px 0 8px", fontSize: "19px", lineHeight: 1.5, color: C.text, fontWeight: 600, maxWidth: "640px" }}>{h.promesse}</p>
+      <p style={{ margin: "0 0 22px", fontSize: "16px", lineHeight: 1.6, color: C.textSecondary }}>{h.pourQui}</p>
+      <button onClick={onStart} className="hero-cta" style={{
+        minHeight: "56px", padding: "16px 28px", borderRadius: "14px", border: "none", maxWidth: "100%",
+        background: `linear-gradient(135deg, ${C.accent}, ${C.accentDark})`, color: "#FFF",
+        fontSize: "17px", fontWeight: 700, fontFamily: FONT_SANS, cursor: "pointer",
+        boxShadow: "0 10px 26px -10px rgba(168,93,44,0.55)",
+      }}>{h.bouton} ↓</button>
+
+      <h2 style={{ fontFamily: FONT_SERIF, fontSize: "22px", color: C.text, margin: "32px 0 12px" }}>How it works</h2>
+      <ol style={{ ...grille(200), listStyle: "none", margin: 0, padding: 0 }}>
+        {h.etapes.map((e) => (
+          <li key={e.n} style={carte}>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "8px" }}>
+              <span aria-hidden="true" style={{ width: "30px", height: "30px", borderRadius: "50%", background: C.primary, color: "#FFF", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}>{e.n}</span>
+              <strong style={{ fontFamily: FONT_SERIF, fontSize: "17px", color: C.text }}>{e.titre}</strong>
+            </div>
+            <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.55, color: C.textSecondary }}>{e.texte}</p>
+          </li>
+        ))}
+      </ol>
+
+      <div style={{ ...grille(260), marginTop: "16px" }}>
+        <div style={carte}>
+          <h2 style={{ fontFamily: FONT_SERIF, fontSize: "19px", color: C.success, margin: "0 0 10px" }}>{h.faitTitre}</h2>
+          {liste(h.fait, "✓", C.success)}
+        </div>
+        <div style={carte}>
+          <h2 style={{ fontFamily: FONT_SERIF, fontSize: "19px", color: C.text, margin: "0 0 10px" }}>{h.pasTitre}</h2>
+          {liste(h.pas, "✕", C.error)}
+        </div>
+      </div>
+
+      <div style={{ ...carte, marginTop: "16px", background: C.primarySoft, border: `1px solid ${C.primary}33` }}>
+        <h2 style={{ fontFamily: FONT_SERIF, fontSize: "19px", color: C.primary, margin: "0 0 10px" }}>{h.prixTitre}</h2>
+        {liste(h.prix, "€", C.primary)}
+      </div>
+      <p style={{ margin: "14px 0 0", fontSize: "14px", color: C.textMuted, lineHeight: 1.5 }}>{h.note}</p>
+    </section>
+  );
+}
+
 function HeroAccueil({ onStart }) {
   const T = useT();
   const gaugeR = 40;
@@ -2622,7 +2748,7 @@ function HeroAccueil({ onStart }) {
                 }}
               />
               <text y="0" textAnchor="middle" fontSize="26" fontWeight="700"
-                    fill={C.success} fontFamily="Fraunces, Georgia, serif">88%</text>
+                    fill={C.success} fontFamily="'Fraunces Variable', Fraunces, Georgia, serif">88%</text>
               <text y="18" textAnchor="middle" fontSize="9" fontWeight="700"
                     fill={C.textMuted} letterSpacing="1.2">COMPATIBLE</text>
             </g>
@@ -2646,7 +2772,7 @@ function Header({ credits, onCreditsClick, session, onLogin, onLogout }) {
       onClick={() => setLang(code)}
       aria-label={code === "fr" ? "Français" : "English"}
       style={{
-        padding: "6px 11px",
+        padding: "6px 12px", minHeight: "36px", minWidth: "40px",
         border: "none",
         background: lang === code ? C.primary : "transparent",
         color: lang === code ? "#FFF" : C.textSecondary,
@@ -2744,7 +2870,7 @@ function CreditBadge({ credits, onClick }) {
         </div>
         <div className="credit-badge-value" style={{ fontSize: "20px", color, fontFamily: FONT_SERIF, fontWeight: 700, lineHeight: 1.2, display: "flex", alignItems: "baseline", gap: "6px" }}>
           {credits}
-          <span className="credit-badge-recharge" style={{ fontSize: "11px", color: C.textMuted, fontWeight: 600, opacity: hover ? 1 : 0.7 }}>
+          <span className="credit-badge-recharge" style={{ fontSize: "11px", color: C.textMuted, fontWeight: 600 }}>
             {T("(recharger)", "(top up)")}
           </span>
         </div>
@@ -2789,7 +2915,7 @@ function StepBar({ current }) {
                 {!last && <div style={{ width: "2px", flex: 1, minHeight: "18px", background: done ? C.success : C.border, margin: "3px 0" }}/>}
               </div>
               <div style={{ paddingTop: "7px", paddingBottom: last ? "0" : "10px" }}>
-                <div style={{ fontSize: "10px", letterSpacing: "0.07em", textTransform: "uppercase", color: C.textMuted, fontFamily: FONT_SANS, fontWeight: 600 }}>{T("Étape", "Step")} {s.id}</div>
+                <div style={{ fontSize: "12px", letterSpacing: "0.07em", textTransform: "uppercase", color: C.textMuted, fontFamily: FONT_SANS, fontWeight: 600 }}>{T("Étape", "Step")} {s.id}</div>
                 <div style={{ fontSize: "14.5px", fontFamily: FONT_SANS, fontWeight: active ? 700 : 500, color: active ? C.primary : done ? C.success : C.textSecondary, lineHeight: 1.25 }}>{s.label}</div>
               </div>
             </div>
@@ -4318,6 +4444,11 @@ function Footer() {
         <p style={{ margin: "0 0 8px", fontSize: "13px" }}>
           {T("Vos données restent confidentielles · Paiement sécurisé Stripe · Conforme RGPD", "Your data stays confidential · Secure Stripe payment · GDPR compliant")}
         </p>
+        <nav aria-label={T("Informations légales", "Legal information")} style={{ margin: "0 0 8px", fontSize: "13px", display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "4px 14px" }}>
+          <a href="/mentions-legales" style={{ color: C.textSecondary, display: "inline-block", padding: "8px 4px" }}>{T("Mentions légales", "Legal notice")}</a>
+          <a href="/cgv" style={{ color: C.textSecondary, display: "inline-block", padding: "8px 4px" }}>{T("CGV", "Terms of sale")}</a>
+          <a href="/confidentialite" style={{ color: C.textSecondary, display: "inline-block", padding: "8px 4px" }}>{T("Confidentialité", "Privacy")}</a>
+        </nav>
         <p style={{ margin: 0, fontSize: "13px" }}>
           © {new Date().getFullYear()} Recrutable · {T("Le service qui aide les candidats à décrocher plus d'entretiens", "The service that helps candidates land more interviews")}
         </p>
@@ -4388,6 +4519,32 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
   const T = useT();
   const [codeInput, setCodeInput] = useState("");
   const [codeMsg, setCodeMsg] = useState(null);
+  // Case obligatoire avant paiement : décochée à chaque ouverture (la
+  // fenêtre est remontée via sa clé, voir le rendu dans App)
+  const [accepte, setAccepte] = useState(false);
+  const [rappelCase, setRappelCase] = useState(false);
+  const [portail, setPortail] = useState({ etat: "repos", msg: "" });
+
+  const acheter = (offre) => (e) => {
+    if (!accepte) {
+      e.preventDefault(); setRappelCase(true);
+      document.getElementById("case-cgv")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    exigerConnexion(e);
+    if (!e.defaultPrevented) enregistrerConsentement(offre);
+  };
+
+  const gererAbonnement = async () => {
+    if (!CURRENT_USER?.id) { DEMANDER_CONNEXION?.(); return; }
+    setPortail({ etat: "chargement", msg: "" });
+    const r = await ouvrirPortailClient();
+    if (r.ok) { window.location.href = r.url; return; }
+    const msg = r.raison === "aucun_abonnement"
+      ? T("Aucun abonnement ni achat Stripe n'est associé à ce compte.", "No Stripe subscription or purchase is linked to this account.")
+      : T(`La gestion en ligne est momentanément indisponible. Écrivez-nous à ${SUPPORT_EMAIL} pour résilier.`, `Online management is temporarily unavailable. Email ${SUPPORT_EMAIL} to cancel.`);
+    setPortail({ etat: "erreur", msg });
+  };
 
   // Empêche le scroll du body quand le modal est ouvert
   useEffect(() => {
@@ -4505,6 +4662,32 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
           {T("Choisissez la formule qui vous convient. Paiement sécurisé via Stripe.", "Choose the plan that suits you. Secure payment via Stripe.")}
         </p>
 
+        {/* Consentement obligatoire avant paiement (CGV + renonciation au
+            droit de rétractation, art. L221-28 13° C. conso) */}
+        <label id="case-cgv" style={{
+          display: "flex", gap: "12px", alignItems: "flex-start", cursor: "pointer",
+          background: accepte ? C.successSoft : (rappelCase ? C.warningSoft : C.bgSubtle),
+          border: `2px solid ${accepte ? C.success : (rappelCase ? C.warning : C.border)}`,
+          borderRadius: "12px", padding: "14px 14px", marginBottom: "16px",
+          fontSize: "14px", lineHeight: 1.5, color: C.text, textAlign: "left",
+        }}>
+          <input
+            type="checkbox" checked={accepte}
+            onChange={e => { setAccepte(e.target.checked); if (e.target.checked) setRappelCase(false); }}
+            style={{ width: "24px", height: "24px", margin: "1px 0 0", flexShrink: 0, accentColor: C.success, cursor: "pointer" }}
+          />
+          <span>
+            {T("J'accepte les ", "I accept the ")}
+            <a href="/cgv" target="_blank" rel="noopener" onClick={e => e.stopPropagation()} style={{ color: C.primary, fontWeight: 600 }}>{T("conditions générales de vente", "terms of sale")}</a>
+            {T(". Je demande l'accès immédiat aux crédits et je renonce à mon droit de rétractation dès leur utilisation.", ". I request immediate access to the credits and waive my right of withdrawal as soon as they are used.")}
+          </span>
+        </label>
+        {rappelCase && !accepte && (
+          <div role="alert" style={{ fontSize: "14px", fontWeight: 600, color: C.warningText, margin: "-8px 0 14px", textAlign: "left" }}>
+            {T("Cochez la case ci-dessus pour continuer vers le paiement.", "Tick the box above to continue to payment.")}
+          </div>
+        )}
+
         {/* Cartes empilées */}
         <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "20px" }}>
           {OFFRES.map(o => (
@@ -4519,7 +4702,7 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
                 <div style={{
                   position: "absolute", top: "-10px", right: "16px",
                   background: o.color, color: "#FFF",
-                  fontSize: "11px", fontWeight: 700, padding: "4px 10px", borderRadius: "10px",
+                  fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "10px",
                   letterSpacing: "0.04em",
                 }}>
                   {o.badge}
@@ -4549,7 +4732,9 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
                 ))}
               </div>
 
-              <a href={o.href} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+              <a href={o.href} onClick={acheter(o.key)} target="_blank" rel="noopener noreferrer"
+                aria-disabled={!accepte} data-offre={o.key}
+                style={{ textDecoration: "none", display: "block", opacity: accepte ? 1 : 0.45, cursor: accepte ? "pointer" : "not-allowed" }}>
                 <div style={{
                   minHeight: "52px",
                   padding: "14px 18px",
@@ -4559,7 +4744,7 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
                   fontSize: "15px",
                   fontWeight: 700,
                   textAlign: "center",
-                  cursor: "pointer",
+                  cursor: "inherit",
                   fontFamily: FONT_SANS,
                 }}>
                   {o.cta}
@@ -4571,6 +4756,23 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
 
         <div style={{ textAlign: "center", fontSize: "13px", color: C.textMuted, marginBottom: "12px" }}>
           {T("🔒 Paiement 100 % sécurisé · Sans engagement · RGPD", "🔒 100% secure payment · No commitment · GDPR")}
+          <br/>
+          <a href="/confidentialite" target="_blank" rel="noopener" style={{ color: C.primary, fontWeight: 600 }}>{T("Politique de confidentialité", "Privacy policy")}</a>
+        </div>
+
+        {/* Résiliation / gestion en ligne de l'abonnement (portail client Stripe) */}
+        <div style={{ textAlign: "center", marginBottom: "16px" }}>
+          <button
+            onClick={gererAbonnement} disabled={portail.etat === "chargement"}
+            style={{
+              minHeight: "48px", padding: "12px 18px", borderRadius: "10px",
+              border: `2px solid ${C.primary}`, background: C.bgCard, color: C.primary,
+              fontSize: "15px", fontWeight: 700, fontFamily: FONT_SANS, cursor: "pointer",
+            }}
+          >
+            {portail.etat === "chargement" ? T("Ouverture…", "Opening…") : T("Gérer ou résilier mon abonnement", "Manage or cancel my subscription")}
+          </button>
+          {portail.msg && <div role="alert" style={{ marginTop: "8px", fontSize: "14px", color: C.error, fontWeight: 600 }}>{portail.msg}</div>}
         </div>
 
         {/* Info paiement automatique */}
@@ -4593,7 +4795,7 @@ function OffresModal({ open, onClose, credits, onRedeem }) {
           <div style={{ fontSize: "14px", fontWeight: 600, color: C.text, marginBottom: "8px", textAlign: "center" }}>{T("Vous avez un code cadeau ?", "Have a gift code?")}</div>
           <div style={{ display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap" }}>
             <input value={codeInput} onChange={(e) => setCodeInput(e.target.value)} placeholder={T("Entrez votre code", "Enter your code")} style={{ flex: 1, minWidth: "180px", padding: "10px 14px", border: `1.5px solid ${C.inputBorder}`, borderRadius: "10px", fontSize: "15px", fontFamily: FONT_SANS, textTransform: "uppercase" }} />
-            <button onClick={async () => { setCodeMsg(null); const r = await onRedeem(codeInput); if (r.ok) { setCodeMsg({ ok: true, text: T(r.credits + " crédits ajoutés ! Vous avez maintenant " + r.total + " crédits.", r.credits + " credits added! You now have " + r.total + " credits.") }); setCodeInput(""); } else if (r.raison === "deja") { setCodeMsg({ ok: false, text: T("Ce code a déjà été utilisé.", "This code has already been used.") }); } else if (r.raison === "connexion") { setCodeMsg({ ok: false, text: T("Connectez-vous pour utiliser un code cadeau.", "Log in to use a gift code.") }); } else if (r.raison === "expire") { setCodeMsg({ ok: false, text: T("Ce code a expiré.", "This code has expired.") }); } else if (r.raison === "epuise") { setCodeMsg({ ok: false, text: T("Ce code n'est plus disponible.", "This code is no longer available.") }); } else { setCodeMsg({ ok: false, text: T("Code invalide.", "Invalid code.") }); } }} style={{ padding: "10px 18px", background: C.primary, color: "#FFF", border: "none", borderRadius: "10px", fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>{T("Valider", "Apply")}</button>
+            <button onClick={async () => { setCodeMsg(null); const r = await onRedeem(codeInput); if (r.ok) { setCodeMsg({ ok: true, text: T(r.credits + " crédits ajoutés ! Vous avez maintenant " + r.total + " crédits.", r.credits + " credits added! You now have " + r.total + " credits.") + mentionValidite(r) }); setCodeInput(""); } else if (r.raison === "deja") { setCodeMsg({ ok: false, text: T("Ce code a déjà été utilisé.", "This code has already been used.") }); } else if (r.raison === "connexion") { setCodeMsg({ ok: false, text: T("Connectez-vous pour utiliser un code cadeau.", "Log in to use a gift code.") }); } else if (r.raison === "expire") { setCodeMsg({ ok: false, text: T("Ce code a expiré.", "This code has expired.") }); } else if (r.raison === "epuise") { setCodeMsg({ ok: false, text: T("Ce code n'est plus disponible.", "This code is no longer available.") }); } else { setCodeMsg({ ok: false, text: T("Code invalide.", "Invalid code.") }); } }} style={{ padding: "10px 18px", background: C.primary, color: "#FFF", border: "none", borderRadius: "10px", fontSize: "15px", fontWeight: 600, fontFamily: FONT_SANS, cursor: "pointer" }}>{T("Valider", "Apply")}</button>
           </div>
           {codeMsg && (<div style={{ marginTop: "8px", fontSize: "13px", textAlign: "center", fontWeight: 600, color: codeMsg.ok ? C.success : C.error }}>{codeMsg.text}</div>)}
         </div>
@@ -4748,7 +4950,7 @@ export default function App() {
       if (annule) return true;
       if (r.ok) {
         setCredits(r.total);
-        setTimeout(() => alert(T("Code cadeau validé ! " + r.credits + " crédits ont été ajoutés à votre compte.", "Gift code applied! " + r.credits + " credits have been added to your account.")), 300);
+        setTimeout(() => alert(T("Code cadeau validé ! " + r.credits + " crédits ont été ajoutés à votre compte." + mentionValidite(r), "Gift code applied! " + r.credits + " credits have been added to your account." + mentionValidite(r))), 300);
         return true;
       }
       return r.raison !== "connexion"; // seul le cas "pas connecté" mérite un retry
@@ -4905,6 +5107,12 @@ export default function App() {
     || [...new Set([...(analyse?.motsManquantsCritiques || []), ...(analyse?.motsManquants || [])])];
   const nbConfirmes = elementsAbsents.filter(m => reponsesOffre[m] === "oui").length;
 
+  // Langue de l'offre saisie (texte collé ou PDF) : décide de la langue du CV.
+  const langueOffreActuelle = () => {
+    const texte = (offrePdfInfo?.texte && !offrePdfInfo.estPhoto) ? offrePdfInfo.texte : offreText;
+    return detecterLangueTexte(texte || "");
+  };
+
   const doCvOpt = async () => {
     if (loading || !canCvOpt) return;
     if (!session) {
@@ -4918,9 +5126,12 @@ export default function App() {
     }
     setLoading(true); setLoadingMsg(T("Réécriture de votre CV", "Rewriting your résumé")); setStep(4);
     setCvOpt(null); setCvOptError(""); setCvEdite(null); setScoreOptimise(null);
-    // Format : les anglophones partent sur le format international (colonne unique,
-    // sans photo, ATS US/UK). Les francophones gardent le format français par défaut.
-    setCouleurId("auto"); setSectionsMasquees([]); setModeTexte(false); setFormatUS(lang === "en");
+    // Format : les anglophones visant un poste à l'international partent sur le
+    // format US/UK (colonne unique, sans photo). Une offre rédigée en français
+    // impose un CV français, même depuis l'interface anglaise (parcours Hirable :
+    // CV anglais + offre française -> CV français).
+    const cibleInternationale = lang === "en" && langueOffreActuelle() !== "fr";
+    setCouleurId("auto"); setSectionsMasquees([]); setModeTexte(false); setFormatUS(cibleInternationale);
     setCvEnAnglais(null); setLangueCV("francais"); setTraductionError("");
     const stopProgress = startProgress();
     try {
@@ -4955,7 +5166,7 @@ export default function App() {
       setCvEdite(cv); // copie de travail pour l'édition contrôlée
       // Interface anglaise : on traduit aussitôt le CV pour l'afficher en anglais
       // par défaut (la version française reste disponible en un clic).
-      if (lang === "en") doTraduction(cv);
+      if (cibleInternationale) doTraduction(cv);
       // Nouveau score : on RECALCULE avec le MÊME algorithme que l'analyse initiale
       // (analyserAlgo), appliqué cette fois au CV réécrit. Même méthode des deux côtés
       // = progression honnête et fiable, et GRATUITE (aucun appel IA en plus).
@@ -5031,10 +5242,10 @@ export default function App() {
       if (offrePdfInfo?.texte && !offrePdfInfo.estPhoto) offreContent = limiterTexte(offrePdfInfo.texte, LIMITS.OFFRE_MAX).texte;
       else if (offreText) offreContent = limiterTexte(offreText, LIMITS.OFFRE_MAX).texte;
 
-      // Interface anglaise : lettre EN ANGLAIS, basée sur le CV anglais
-      // s'il existe (sinon le CV français, Claude gère la transition).
+      // Interface anglaise et offre non française : lettre EN ANGLAIS, basée
+      // sur le CV anglais s'il existe. Offre en français : lettre en français.
       // Le prompt (et la règle de langue) vivent désormais CÔTÉ SERVEUR.
-      const lettreEnAnglais = lang === "en";
+      const lettreEnAnglais = lang === "en" && detecterLangueTexte(offreContent) !== "fr";
       const cvSource = (lettreEnAnglais && cvEnAnglais) ? cvEnAnglais : (cvEdite || cvOpt);
       const payloadLettre = {
         cv: cvSource ? cvVersTexte(cvSource) : "",
@@ -5172,21 +5383,30 @@ export default function App() {
       )}
 
       <OffresModal
+        key={showOffres ? "offres-ouvertes" : "offres-fermees"}
         open={showOffres}
         onClose={() => setShowOffres(false)}
         credits={credits}
         onRedeem={async (code) => { const r = await utiliserCodeCadeau(code); if (r.ok) setCredits(r.total); return r; }}
       />
 
-      <div className={`app-main-container${step === 1 && montrerHero ? " accueil-mode" : ""}`} style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>
+      <div className={`app-main-container${step === 1 && (montrerHero || PAGE_EN) ? " accueil-mode" : ""}`} style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>
 
-        <div className="app-rail"><StepBar current={step}/></div>
+        {/* Accueil /en : l'accroche passe avant la barre d'étapes */}
+        {!(PAGE_EN && step === 1) && <div className="app-rail"><StepBar current={step}/></div>}
         <div className="app-stage">
 
         {/* HERO D'ACCUEIL, première visite uniquement.
             Tablette/PC : bloc intégré au-dessus du formulaire.
             Téléphone : écran de bienvenue plein écran, fermable d'une croix. */}
-        {step === 1 && montrerHero && (
+        {/* PAGE /en (Hirable) : en-tête dédié à la place de l'accueil habituel */}
+        {step === 1 && PAGE_EN && (
+          <HirableAccueil onStart={() => {
+            document.querySelector(".main-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}/>
+        )}
+
+        {step === 1 && montrerHero && !PAGE_EN && (
           <>
             <HeroAccueil onStart={() => {
               document.querySelector(".main-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -5805,46 +6025,19 @@ export default function App() {
               {T("Choisissez la formule qui vous convient pour continuer à optimiser vos candidatures :", "Choose the plan that suits you to keep optimizing your applications:")}
             </p>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "420px", margin: "0 auto" }}>
-              <a href={stripeUrl(STRIPE_ANNUEL)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <div style={{
-                  padding: "16px 20px",
-                  background: C.accent, color: "#FFF",
-                  fontSize: "16px", fontWeight: 700,
-                  borderRadius: "12px", position: "relative",
-                  boxShadow: "0 4px 12px rgba(168,93,44,0.25)",
-                }}>
-                  <div style={{ position: "absolute", top: "-10px", right: "16px", background: C.success, color: "#FFF", fontSize: "11px", padding: "3px 10px", borderRadius: "10px", fontWeight: 700 }}>
-                    {T("★ Meilleure offre", "★ Best value")}
-                  </div>
-                  {T("Annuel, 49,99 € (60 dossiers complets)", "Annual, €49.99 (60 complete sets)")}
-                </div>
-              </a>
-              <a href={stripeUrl(STRIPE_MENSUEL)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <div style={{
-                  padding: "14px 20px",
-                  background: C.bgCard, color: C.primary,
-                  border: `2px solid ${C.primary}`,
-                  fontSize: "15px", fontWeight: 600,
-                  borderRadius: "12px",
-                }}>
-                  {T("Mensuel, 5,99 € / mois (8 dossiers / mois)", "Monthly, €5.99 / month (8 sets / month)")}
-                </div>
-              </a>
-              <a href={stripeUrl(STRIPE_RECHARGE)} onClick={exigerConnexion} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
-                <div style={{
-                  padding: "14px 20px",
-                  background: C.bgCard, color: C.textSecondary,
-                  border: `1px solid ${C.borderStrong}`,
-                  fontSize: "14px", fontWeight: 600,
-                  borderRadius: "12px",
-                }}>
-                  {T("Recharge ponctuelle, 2,99 € (3 dossiers complets)", "One-time top-up, €2.99 (3 complete sets)")}
-                </div>
-              </a>
+            <div style={{ maxWidth: "420px", margin: "0 auto" }}>
+              <button onClick={() => setShowOffres(true)} className="primary-btn" style={{
+                width: "100%", minHeight: "56px", padding: "16px 20px",
+                background: C.accent, color: "#FFF", border: "none",
+                fontSize: "16px", fontWeight: 700, fontFamily: FONT_SANS,
+                borderRadius: "12px", cursor: "pointer",
+                boxShadow: "0 4px 12px rgba(168,93,44,0.25)",
+              }}>
+                {T("Voir les formules (dès 2,99 €)", "See the plans (from €2.99)")}
+              </button>
             </div>
 
-            <div style={{ fontSize: "12px", color: C.textMuted, marginTop: "16px", fontStyle: "italic" }}>
+            <div style={{ fontSize: "13px", color: C.textMuted, marginTop: "16px", fontStyle: "italic" }}>
               {T("🔒 Paiement sécurisé Stripe · Sans engagement", "🔒 Secure Stripe payment · No commitment")}
             </div>
           </div>

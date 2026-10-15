@@ -4,7 +4,7 @@
 // (scripts/generer-page-en.mjs), pour les moteurs et les aperçus de liens.
 // Règles : aucun tiret cadratin, aucune statistique, prix réels du catalogue.
 
-export const URL_PAGE_EN = "https://recrutable.com/en";
+export const URL_PAGE_EN = "https://recrutable.com/en/";
 
 export const SEO_EN = {
   titre: "English CV to French CV | Hirable by Recrutable",
@@ -62,7 +62,7 @@ export function htmlStatiqueHirable() {
 <h2>${esc(h.faitTitre)}</h2>${liste(h.fait)}
 <h2>${esc(h.pasTitre)}</h2>${liste(h.pas)}
 <h2>${esc(h.prixTitre)}</h2>${liste(h.prix)}
-<p><a href="/en">${esc(h.bouton)}</a></p>
+<p><a href="/en/">${esc(h.bouton)}</a></p>
 <p>${esc(h.note)}</p>
 <noscript><p><strong>Hirable needs JavaScript. Please enable it in your browser to analyse your CV.</strong></p></noscript>
 </main>`;

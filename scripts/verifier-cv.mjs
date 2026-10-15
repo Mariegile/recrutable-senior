@@ -62,6 +62,9 @@ test("compétences regroupées par thème : aller-retour sans perte", () => {
   // virgules entre parenthèses conservées (cas réel de la preview)
   assert.deepEqual(separerTheme("Production culinaire : Cuisine traditionnelle (entrées, plats, desserts), Liaison froide").elements,
     ["Cuisine traditionnelle (entrées, plats, desserts)", "Liaison froide"]);
+  // majuscule initiale de chaque puce (cas réel Hirable), noms type « iOS » intacts
+  assert.deepEqual(separerTheme("Gestion opérationnelle : Logiciel de caisse Lightspeed POS, outil de réservation OpenTable, iOS, élaboration des menus").elements,
+    ["Logiciel de caisse Lightspeed POS", "Outil de réservation OpenTable", "iOS", "Élaboration des menus"]);
 });
 
 test("le contrôle détecte bien les défauts de l'ancienne sortie", () => {

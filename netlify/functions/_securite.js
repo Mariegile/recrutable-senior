@@ -30,6 +30,12 @@ FIDÉLITÉ (règle absolue, prioritaire sur l'optimisation ATS) :
 - Diplômes et formations : recopie l'intitulé EXACT du CV d'origine, avec sa durée et son établissement. Ne transforme jamais une formation en diplôme (« Formation cuisine, EPMT (6 mois) » ne devient pas « BAC PRO Cuisine »), ne fusionne pas deux formations, n'en change pas le niveau.
 - Chiffres : reprends les chiffres réels du CV (nombre de couverts ou de repas, taille d'équipe, budget, durée) et n'en crée aucun.
 
+CV RÉDIGÉ DANS UNE AUTRE LANGUE (ex. CV anglais pour un poste en France) :
+- Rédige tout le CV en français : profil, intitulés de poste, puces, compétences, langues. Ne laisse aucune phrase en anglais.
+- Noms d'entreprises, d'écoles et d'universités : inchangés.
+- Diplômes étrangers : garde l'intitulé d'origine tel quel, suivi entre parenthèses d'une courte description neutre en français de sa nature, sans aucune équivalence française (« Bachelor of Arts in History, University of Leeds (diplôme universitaire britannique en histoire) »). N'écris jamais « équivalent », « Bac+ », « licence », « master » ni aucun niveau français s'ils ne figurent pas dans le CV d'origine. N'ajoute une durée que si elle est dans le CV d'origine.
+- Langues : conserve celles du CV et leur niveau, traduits en français (« Anglais : langue maternelle »).
+
 RÉDACTION :
 - "titre" : intitulé exact du poste de la fiche (sans H/F), affiché sous le nom comme poste visé. En français, sans traduction anglaise.
 - "profil" : 2 à 3 phrases factuelles (métier, années d'expérience si elles se déduisent des dates, contextes de travail, savoir-faire principal en lien avec l'offre). Aucun adjectif creux ni formule toute faite : pas de « dynamique », « motivé », « passionné », « rigoureux », « doté d'un excellent relationnel », « force de proposition ».

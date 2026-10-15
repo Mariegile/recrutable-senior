@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback, createContext, useContext } from "react";
 import { createClient } from "@supabase/supabase-js";
+import { HIRABLE } from "./contenuHirable.js";
 import { restaurerAccents, nettoyerTiretsCv, aplatirCompetences, preparerQuestions } from "./cvTexte.js";
 import { genererCvHtmlFr } from "./cvModele.js";
 
@@ -25,9 +26,27 @@ let CURRENT_LANG = "fr";
 // Traducteur global (hors React), même logique que le hook useT.
 function tg(fr, en) { return CURRENT_LANG === "en" && en !== undefined ? en : fr; }
 
+// Page d'atterrissage anglaise (Hirable) : /en, ouvre l'app en anglais.
+const CHEMIN_EN = "/en";
+function surPageAnglaise() {
+  try { return window.location.pathname.replace(/\/+$/, "") === CHEMIN_EN; } catch { return false; }
+}
+
+const PAGE_EN = surPageAnglaise();
+
 function detectLang() {
   try {
-    // Seul un choix explicite (onglet FR/EN, mémorisé) fait passer en anglais.
+    // Choix explicite à l'arrivée : ?lang=en / ?lang=fr (campagnes) ou page
+    // /en. Il est mémorisé exactement comme un clic sur l'onglet FR/EN.
+    // Les autres paramètres (?src=, ?code=) ne sont pas touchés.
+    const demande = new URLSearchParams(window.location.search).get("lang");
+    const force = demande === "en" || demande === "fr" ? demande : (surPageAnglaise() ? "en" : null);
+    if (force) {
+      try { localStorage.setItem(LANG_KEY, force); } catch { /* stockage indisponible */ }
+      CURRENT_LANG = force;
+      return force;
+    }
+    // Sinon, seul un choix explicite (onglet FR/EN, mémorisé) fait passer en anglais.
     // Par défaut : français, quelle que soit la langue du navigateur. Cela évite
     // notamment que les robots des moteurs (navigateur en anglais) indexent la
     // version anglaise d'un site destiné au marché français.
@@ -2563,6 +2582,72 @@ function HeroOverlayMobile({ onClose }) {
 // ── Accueil : bloc de bienvenue, affiché uniquement à la première visite ──
 // Objectif : donner envie dès l'arrivée (promesse, preuve visuelle, 3 étapes)
 // avant de présenter le formulaire de l'étape 1.
+// ── Page /en (Hirable) : CV anglais -> CV français, en-tête dédié ──
+// Texte dans contenuHirable.js (partagé avec le HTML statique du build).
+function HirableAccueil({ onStart }) {
+  const h = HIRABLE;
+  const carte = { background: C.bgCard, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "18px 18px" };
+  const grille = (min) => ({ display: "grid", gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${min}px), 1fr))`, gap: "12px" });
+  const liste = (items, signe, couleur) => (
+    <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+      {items.map((x) => (
+        <li key={x} style={{ display: "flex", gap: "10px", alignItems: "flex-start", fontSize: "15.5px", lineHeight: 1.55, color: C.textSecondary }}>
+          <span aria-hidden="true" style={{ color: couleur, fontWeight: 700, flexShrink: 0 }}>{signe}</span><span>{x}</span>
+        </li>
+      ))}
+    </ul>
+  );
+  return (
+    <section aria-labelledby="hirable-titre" style={{ fontFamily: FONT_SANS, marginBottom: "28px", overflowWrap: "anywhere" }}>
+      <div style={{
+        display: "inline-flex", background: C.accentSoft, border: `1px solid ${C.accent}40`, color: C.accentDark,
+        borderRadius: "999px", padding: "7px 14px", fontSize: "13.5px", fontWeight: 700, marginBottom: "16px",
+      }}>{h.surtitre}</div>
+      <h1 id="hirable-titre" className="hero-title" style={{ margin: 0, fontFamily: FONT_SERIF, fontWeight: 700, color: C.text, letterSpacing: "-0.02em", lineHeight: 1.12 }}>
+        {h.titre}
+      </h1>
+      <p style={{ margin: "16px 0 8px", fontSize: "19px", lineHeight: 1.5, color: C.text, fontWeight: 600, maxWidth: "640px" }}>{h.promesse}</p>
+      <p style={{ margin: "0 0 22px", fontSize: "16px", lineHeight: 1.6, color: C.textSecondary }}>{h.pourQui}</p>
+      <button onClick={onStart} className="hero-cta" style={{
+        minHeight: "56px", padding: "16px 28px", borderRadius: "14px", border: "none", maxWidth: "100%",
+        background: `linear-gradient(135deg, ${C.accent}, ${C.accentDark})`, color: "#FFF",
+        fontSize: "17px", fontWeight: 700, fontFamily: FONT_SANS, cursor: "pointer",
+        boxShadow: "0 10px 26px -10px rgba(168,93,44,0.55)",
+      }}>{h.bouton} ↓</button>
+
+      <h2 style={{ fontFamily: FONT_SERIF, fontSize: "22px", color: C.text, margin: "32px 0 12px" }}>How it works</h2>
+      <ol style={{ ...grille(200), listStyle: "none", margin: 0, padding: 0 }}>
+        {h.etapes.map((e) => (
+          <li key={e.n} style={carte}>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "8px" }}>
+              <span aria-hidden="true" style={{ width: "30px", height: "30px", borderRadius: "50%", background: C.primary, color: "#FFF", display: "inline-flex", alignItems: "center", justifyContent: "center", fontWeight: 700, flexShrink: 0 }}>{e.n}</span>
+              <strong style={{ fontFamily: FONT_SERIF, fontSize: "17px", color: C.text }}>{e.titre}</strong>
+            </div>
+            <p style={{ margin: 0, fontSize: "15px", lineHeight: 1.55, color: C.textSecondary }}>{e.texte}</p>
+          </li>
+        ))}
+      </ol>
+
+      <div style={{ ...grille(260), marginTop: "16px" }}>
+        <div style={carte}>
+          <h2 style={{ fontFamily: FONT_SERIF, fontSize: "19px", color: C.success, margin: "0 0 10px" }}>{h.faitTitre}</h2>
+          {liste(h.fait, "✓", C.success)}
+        </div>
+        <div style={carte}>
+          <h2 style={{ fontFamily: FONT_SERIF, fontSize: "19px", color: C.text, margin: "0 0 10px" }}>{h.pasTitre}</h2>
+          {liste(h.pas, "✕", C.error)}
+        </div>
+      </div>
+
+      <div style={{ ...carte, marginTop: "16px", background: C.primarySoft, border: `1px solid ${C.primary}33` }}>
+        <h2 style={{ fontFamily: FONT_SERIF, fontSize: "19px", color: C.primary, margin: "0 0 10px" }}>{h.prixTitre}</h2>
+        {liste(h.prix, "€", C.primary)}
+      </div>
+      <p style={{ margin: "14px 0 0", fontSize: "14px", color: C.textMuted, lineHeight: 1.5 }}>{h.note}</p>
+    </section>
+  );
+}
+
 function HeroAccueil({ onStart }) {
   const T = useT();
   const gaugeR = 40;
@@ -5022,6 +5107,12 @@ export default function App() {
     || [...new Set([...(analyse?.motsManquantsCritiques || []), ...(analyse?.motsManquants || [])])];
   const nbConfirmes = elementsAbsents.filter(m => reponsesOffre[m] === "oui").length;
 
+  // Langue de l'offre saisie (texte collé ou PDF) : décide de la langue du CV.
+  const langueOffreActuelle = () => {
+    const texte = (offrePdfInfo?.texte && !offrePdfInfo.estPhoto) ? offrePdfInfo.texte : offreText;
+    return detecterLangueTexte(texte || "");
+  };
+
   const doCvOpt = async () => {
     if (loading || !canCvOpt) return;
     if (!session) {
@@ -5035,9 +5126,12 @@ export default function App() {
     }
     setLoading(true); setLoadingMsg(T("Réécriture de votre CV", "Rewriting your résumé")); setStep(4);
     setCvOpt(null); setCvOptError(""); setCvEdite(null); setScoreOptimise(null);
-    // Format : les anglophones partent sur le format international (colonne unique,
-    // sans photo, ATS US/UK). Les francophones gardent le format français par défaut.
-    setCouleurId("auto"); setSectionsMasquees([]); setModeTexte(false); setFormatUS(lang === "en");
+    // Format : les anglophones visant un poste à l'international partent sur le
+    // format US/UK (colonne unique, sans photo). Une offre rédigée en français
+    // impose un CV français, même depuis l'interface anglaise (parcours Hirable :
+    // CV anglais + offre française -> CV français).
+    const cibleInternationale = lang === "en" && langueOffreActuelle() !== "fr";
+    setCouleurId("auto"); setSectionsMasquees([]); setModeTexte(false); setFormatUS(cibleInternationale);
     setCvEnAnglais(null); setLangueCV("francais"); setTraductionError("");
     const stopProgress = startProgress();
     try {
@@ -5072,7 +5166,7 @@ export default function App() {
       setCvEdite(cv); // copie de travail pour l'édition contrôlée
       // Interface anglaise : on traduit aussitôt le CV pour l'afficher en anglais
       // par défaut (la version française reste disponible en un clic).
-      if (lang === "en") doTraduction(cv);
+      if (cibleInternationale) doTraduction(cv);
       // Nouveau score : on RECALCULE avec le MÊME algorithme que l'analyse initiale
       // (analyserAlgo), appliqué cette fois au CV réécrit. Même méthode des deux côtés
       // = progression honnête et fiable, et GRATUITE (aucun appel IA en plus).
@@ -5148,10 +5242,10 @@ export default function App() {
       if (offrePdfInfo?.texte && !offrePdfInfo.estPhoto) offreContent = limiterTexte(offrePdfInfo.texte, LIMITS.OFFRE_MAX).texte;
       else if (offreText) offreContent = limiterTexte(offreText, LIMITS.OFFRE_MAX).texte;
 
-      // Interface anglaise : lettre EN ANGLAIS, basée sur le CV anglais
-      // s'il existe (sinon le CV français, Claude gère la transition).
+      // Interface anglaise et offre non française : lettre EN ANGLAIS, basée
+      // sur le CV anglais s'il existe. Offre en français : lettre en français.
       // Le prompt (et la règle de langue) vivent désormais CÔTÉ SERVEUR.
-      const lettreEnAnglais = lang === "en";
+      const lettreEnAnglais = lang === "en" && detecterLangueTexte(offreContent) !== "fr";
       const cvSource = (lettreEnAnglais && cvEnAnglais) ? cvEnAnglais : (cvEdite || cvOpt);
       const payloadLettre = {
         cv: cvSource ? cvVersTexte(cvSource) : "",
@@ -5296,7 +5390,7 @@ export default function App() {
         onRedeem={async (code) => { const r = await utiliserCodeCadeau(code); if (r.ok) setCredits(r.total); return r; }}
       />
 
-      <div className={`app-main-container${step === 1 && montrerHero ? " accueil-mode" : ""}`} style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>
+      <div className={`app-main-container${step === 1 && (montrerHero || PAGE_EN) ? " accueil-mode" : ""}`} style={{ maxWidth: "780px", margin: "0 auto", padding: "32px 16px 60px", position: "relative", zIndex: 1 }}>
 
         <div className="app-rail"><StepBar current={step}/></div>
         <div className="app-stage">
@@ -5304,7 +5398,14 @@ export default function App() {
         {/* HERO D'ACCUEIL, première visite uniquement.
             Tablette/PC : bloc intégré au-dessus du formulaire.
             Téléphone : écran de bienvenue plein écran, fermable d'une croix. */}
-        {step === 1 && montrerHero && (
+        {/* PAGE /en (Hirable) : en-tête dédié à la place de l'accueil habituel */}
+        {step === 1 && PAGE_EN && (
+          <HirableAccueil onStart={() => {
+            document.querySelector(".main-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}/>
+        )}
+
+        {step === 1 && montrerHero && !PAGE_EN && (
           <>
             <HeroAccueil onStart={() => {
               document.querySelector(".main-card")?.scrollIntoView({ behavior: "smooth", block: "start" });

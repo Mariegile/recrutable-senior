@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/generer-page-en.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "verifier-cv": "node --test scripts/verifier-cv.mjs",
